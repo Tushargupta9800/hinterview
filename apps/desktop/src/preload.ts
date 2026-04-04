@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("hinterviewDesktop", {
   apiBaseUrl: process.env.SERVER_URL ?? "http://localhost:8787",
   platform: process.platform,
+  openExternal: (url: string) => ipcRenderer.invoke("app:open-external", url) as Promise<void>,
   transcribeAudio: (payload: { audioBytes: Uint8Array; fileName?: string; locale?: string }) =>
     ipcRenderer.invoke("audio:transcribe", payload) as Promise<{ text: string }>,
   onOpenSettings: (handler: () => void) => {

@@ -4,7 +4,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import type { MenuItemConstructorOptions } from "electron";
-import { Menu, app, BrowserWindow, ipcMain, nativeImage } from "electron";
+import { Menu, app, BrowserWindow, ipcMain, nativeImage, shell } from "electron";
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
@@ -68,6 +68,19 @@ const runProcess = (command: string, args: string[]) =>
 
 const runSpeechHelper = (inputPath: string, outputPath: string, locale: string) =>
   runProcess("open", ["-W", helperAppPath, "--args", inputPath, outputPath, locale]);
+
+const openExternalUrl = async (url: string) => {
+  if (process.platform === "darwin") {
+    try {
+      await runProcess("open", ["-a", "Google Chrome", url]);
+      return;
+    } catch {
+      // Fallback to the default browser if Chrome is unavailable.
+    }
+  }
+
+  await shell.openExternal(url);
+};
 
 const ensureSpeechHelper = async () => {
   const [sourceStats, executableStats] = await Promise.allSettled([fs.stat(helperSourcePath), fs.stat(helperExecutablePath)]);
@@ -189,6 +202,22 @@ const createWindow = async () => {
 
   const window = new BrowserWindow(windowOptions);
 
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      void openExternalUrl(url);
+      return { action: "deny" };
+    }
+
+    return { action: "allow" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    if (/^https?:\/\//i.test(url) && !url.startsWith(rendererDevUrl)) {
+      event.preventDefault();
+      void openExternalUrl(url);
+    }
+  });
+
   buildMenu(window);
 
   if (!app.isPackaged) {
@@ -204,6 +233,9 @@ app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock && !appIcon.isEmpty()) {
     app.dock.setIcon(appIcon);
   }
+  ipcMain.handle("app:open-external", async (_event, url: string) => {
+    await openExternalUrl(url);
+  });
   ipcMain.handle("audio:transcribe", async (_event, payload: { audioBytes: Uint8Array; fileName?: string; locale?: string }) =>
     transcribeAudioBytes(payload)
   );

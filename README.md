@@ -96,7 +96,7 @@ It gives you:
 
 <img src="./screenshots/custom-question-flow.png" alt="Custom question flow" width="960" />
 
-#### Dark Mode
+#### LIGHT Mode
 
 <img src="./screenshots/dark-mode.png" alt="Dark mode" width="960" />
 

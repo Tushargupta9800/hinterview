@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import paypalQr from "../../../../screenshots/paypal.jpeg";
 import { navigateToLibraryBase } from "../lib/navigation";
 import { useAppStore } from "../store/appStore";
 
@@ -14,6 +15,7 @@ export function AppHeader() {
   const { currentMode, currentQuestion, openSettings, saveLearningNote, theme, toggleTheme } = useAppStore();
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -35,6 +37,7 @@ export function AppHeader() {
   useEffect(() => {
     setFileMenuOpen(false);
     setRulesOpen(false);
+    setSupportOpen(false);
   }, [location.pathname]);
 
   const sectionLabel = location.pathname.startsWith("/questions/") ? "Practice Session" : "Question Library";
@@ -48,6 +51,15 @@ export function AppHeader() {
         currentMode ? `Current track: ${modeLabel[currentMode]}.` : null
       ].filter((rule): rule is string => Boolean(rule)))
     : [];
+
+  const openSupportLink = (url: string) => async (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (!window.hinterviewDesktop?.openExternal) {
+      return;
+    }
+
+    event.preventDefault();
+    await window.hinterviewDesktop.openExternal(url);
+  };
 
   return (
     <>
@@ -162,6 +174,16 @@ export function AppHeader() {
                   >
                     <span>{theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}</span>
                   </button>
+                  <button
+                    className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-brand-surface hover:text-brand-ink"
+                    onClick={() => {
+                      setFileMenuOpen(false);
+                      setSupportOpen(true);
+                    }}
+                    type="button"
+                  >
+                    <span>Support</span>
+                  </button>
 
                   <div className="mx-2 my-2 h-px bg-slate-200" />
                   <div className="px-3 pb-2 pt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Rules</div>
@@ -211,6 +233,119 @@ export function AppHeader() {
                   {rule}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {supportOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-sm">
+          <div
+            aria-labelledby="support-title"
+            aria-modal="true"
+            className="w-full max-w-4xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_28px_90px_rgba(22,28,36,0.28)]"
+            role="dialog"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-brand-teal">Support</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-brand-ink" id="support-title">
+                  About the creator
+                </h2>
+              </div>
+              <button
+                aria-label="Close support dialog"
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-brand-ink"
+                onClick={() => setSupportOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_340px]">
+              <div className="space-y-5">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-brand-surface px-5 py-5">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-teal">Creator</div>
+                  <h3 className="mt-2 text-xl font-semibold text-brand-ink">Tushar Gupta</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    IIIT Allahabad Information Technology graduate from 2023 and a backend software engineer who built
+                    this project from scratch with vibe coding.
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    Main interests: backend systems, reliable APIs, async workflows, database design, CI/CD, system
+                    architecture, Java, Spring Boot, JavaScript, TypeScript, Flutter, Dart, and C++.
+                  </p>
+                </section>
+
+                <section className="rounded-[1.4rem] border border-slate-200 bg-brand-surface px-5 py-5">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-teal">Bug reports</div>
+                  <h3 className="mt-2 text-lg font-semibold text-brand-ink">Raise an issue</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    If you find a bug or want to suggest an improvement, please open an issue in the repository.
+                  </p>
+                  <a
+                    className="mt-4 inline-flex rounded-full bg-brand-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#102232]"
+                    href="https://github.com/Tushargupta9800/hinterview"
+                    onClick={openSupportLink("https://github.com/Tushargupta9800/hinterview")}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Open GitHub Repository
+                  </a>
+                </section>
+              </div>
+
+              <div className="space-y-5">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-brand-surface px-5 py-5">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-teal">Connect</div>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Email</div>
+                      <div className="mt-1 text-sm font-medium text-brand-ink">tushargupta9800@gmail.com</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-teal/40 hover:text-brand-teal"
+                        href="https://www.linkedin.com/in/tushar-gupta-algoristy/"
+                        onClick={openSupportLink("https://www.linkedin.com/in/tushar-gupta-algoristy/")}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        LinkedIn
+                      </a>
+                      <a
+                        className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-teal/40 hover:text-brand-teal"
+                        href="https://github.com/Tushargupta9800"
+                        onClick={openSupportLink("https://github.com/Tushargupta9800")}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        GitHub
+                      </a>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-[1.4rem] border border-slate-200 bg-brand-surface px-5 py-5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-brand-teal">Support the project</div>
+                      <h3 className="mt-1 text-lg font-semibold text-brand-ink">Buy me a coffee</h3>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                      Use PayPal
+                    </span>
+                  </div>
+                  <div className="mt-4 flex justify-center rounded-[1.2rem] border border-slate-200 bg-white p-3">
+                    <img
+                      alt="PayPal QR code"
+                      className="w-full max-w-[220px] rounded-[0.9rem]"
+                      src={paypalQr}
+                    />
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
         </div>
