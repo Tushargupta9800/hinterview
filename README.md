@@ -102,16 +102,52 @@ The user can:
 
 Project screenshots are available in [`screenshots/`](/Users/tushargupta/personal/hinterview/screenshots).
 
-Included files:
-- [Screenshot 2026-04-04 at 7.38.05 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.38.05%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.38.31 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.38.31%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.38.52 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.38.52%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.39.36 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.39.36%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.41.36 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.41.36%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.41.53 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.41.53%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.42.09 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.42.09%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.42.31 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.42.31%E2%80%AFPM.png)
-- [Screenshot 2026-04-04 at 7.42.42 PM.png](/Users/tushargupta/personal/hinterview/screenshots/Screenshot%202026-04-04%20at%207.42.42%E2%80%AFPM.png)
+### Product Gallery
+
+<table>
+  <tr>
+    <td align="center">
+      <div><strong>Question Library</strong></div>
+      <img src="./screenshots/library.png" alt="Question library" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>Question Detail</strong></div>
+      <img src="./screenshots/question-detail.png" alt="Question detail" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>Playground and Evaluation</strong></div>
+      <img src="./screenshots/playground-evaluation.png" alt="Playground and evaluation" width="320" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <div><strong>Shared Question Flow</strong></div>
+      <img src="./screenshots/shared-question-flow.png" alt="Shared question flow" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>My Learning</strong></div>
+      <img src="./screenshots/my-learning.png" alt="My learning" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>Learning Themes and Notes</strong></div>
+      <img src="./screenshots/learning-themes-notes.png" alt="Learning themes and notes" width="320" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <div><strong>Settings and Agent Profiles</strong></div>
+      <img src="./screenshots/settings-agent-profiles.png" alt="Settings and agent profiles" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>Custom Question Flow</strong></div>
+      <img src="./screenshots/custom-question-flow.png" alt="Custom question flow" width="320" />
+    </td>
+    <td align="center">
+      <div><strong>Dark Mode</strong></div>
+      <img src="./screenshots/dark-mode.png" alt="Dark mode" width="320" />
+    </td>
+  </tr>
+</table>
 
 ## Commands
 
