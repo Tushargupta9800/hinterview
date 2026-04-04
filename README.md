@@ -2,6 +2,8 @@
 
 Practice system design interviews with guided questions, AI feedback, a shared diagram playground, and local-first progress tracking.
 
+Support this project: [PayPal QR](./screenshots/paypal.jpeg)
+
 ## ✨ What It Is
 
 Hinterview is a desktop + web app for practicing:
