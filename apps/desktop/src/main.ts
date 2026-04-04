@@ -1,7 +1,8 @@
 import path from "node:path";
+import type { Server } from "node:http";
 import fs from "node:fs/promises";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import type { MenuItemConstructorOptions } from "electron";
 import { Menu, app, BrowserWindow, ipcMain, nativeImage, shell } from "electron";
@@ -180,6 +181,30 @@ const buildMenu = (window: BrowserWindow) => {
 };
 
 const appIcon = nativeImage.createFromPath(appIconPath);
+let bundledApiServer: Server | null = null;
+
+const startBundledServer = async () => {
+  const serverAppPath = app.isPackaged
+    ? path.resolve(currentDir, "../../server/dist/app.js")
+    : path.resolve(currentDir, "../../server/dist/app.js");
+
+  const serverModule = await import(pathToFileURL(serverAppPath).href) as {
+    createApp: () => { listen: (...args: unknown[]) => Server };
+  };
+
+  const expressApp = serverModule.createApp();
+  bundledApiServer = await new Promise<Server>((resolve, reject) => {
+    const server = expressApp.listen(0, "127.0.0.1", () => resolve(server));
+    server.on("error", reject);
+  });
+
+  const address = bundledApiServer.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Failed to resolve bundled API server port.");
+  }
+
+  process.env.SERVER_URL = `http://127.0.0.1:${address.port}`;
+};
 
 const createWindow = async () => {
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -233,6 +258,9 @@ app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock && !appIcon.isEmpty()) {
     app.dock.setIcon(appIcon);
   }
+  if (app.isPackaged) {
+    await startBundledServer();
+  }
   ipcMain.handle("app:open-external", async (_event, url: string) => {
     await openExternalUrl(url);
   });
@@ -252,4 +280,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  bundledApiServer?.close();
 });

@@ -1,4 +1,4 @@
-import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import paypalQr from "../../../../screenshots/paypal.jpeg";
 import { navigateToLibraryBase } from "../lib/navigation";
@@ -52,13 +52,13 @@ export function AppHeader() {
       ].filter((rule): rule is string => Boolean(rule)))
     : [];
 
-  const openSupportLink = (url: string) => async (event: ReactMouseEvent<HTMLAnchorElement>) => {
-    if (!window.hinterviewDesktop?.openExternal) {
+  const openSupportLink = (url: string) => async () => {
+    if (window.hinterviewDesktop?.openExternal) {
+      await window.hinterviewDesktop.openExternal(url);
       return;
     }
 
-    event.preventDefault();
-    await window.hinterviewDesktop.openExternal(url);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -284,15 +284,13 @@ export function AppHeader() {
                   <p className="mt-3 text-sm leading-7 text-slate-700">
                     If you find a bug or want to suggest an improvement, please open an issue in the repository.
                   </p>
-                  <a
+                  <button
                     className="mt-4 inline-flex rounded-full bg-brand-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#102232]"
-                    href="https://github.com/Tushargupta9800/hinterview"
                     onClick={openSupportLink("https://github.com/Tushargupta9800/hinterview")}
-                    rel="noreferrer"
-                    target="_blank"
+                    type="button"
                   >
                     Open GitHub Repository
-                  </a>
+                  </button>
                 </section>
               </div>
 
@@ -305,24 +303,20 @@ export function AppHeader() {
                       <div className="mt-1 text-sm font-medium text-brand-ink">tushargupta9800@gmail.com</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <a
+                      <button
                         className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-teal/40 hover:text-brand-teal"
-                        href="https://www.linkedin.com/in/tushar-gupta-algoristy/"
                         onClick={openSupportLink("https://www.linkedin.com/in/tushar-gupta-algoristy/")}
-                        rel="noreferrer"
-                        target="_blank"
+                        type="button"
                       >
                         LinkedIn
-                      </a>
-                      <a
+                      </button>
+                      <button
                         className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-teal/40 hover:text-brand-teal"
-                        href="https://github.com/Tushargupta9800"
                         onClick={openSupportLink("https://github.com/Tushargupta9800")}
-                        rel="noreferrer"
-                        target="_blank"
+                        type="button"
                       >
                         GitHub
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </section>

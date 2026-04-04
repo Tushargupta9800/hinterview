@@ -8,6 +8,7 @@ const requiredPaths = [
   "apps/server/dist/index.js",
   "apps/renderer/dist/index.html",
   "apps/desktop/dist/main.js",
+  "apps/desktop/build/icon.icns",
   "apps/desktop/src/native/speech-transcribe.swift",
   "codex/release-checklist.md"
 ];

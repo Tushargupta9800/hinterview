@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "apps/desktop/dist/main.js",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -16,10 +17,45 @@
     "dev": "concurrently -k -n shared,server,renderer,desktop:watch,desktop -c auto \"npm run watch -w @hinterview/shared\" \"npm run dev -w @hinterview/server\" \"npm run dev -w @hinterview/renderer\" \"npm run watch -w @hinterview/desktop\" \"wait-on packages/shared/dist/index.js apps/desktop/dist/main.js tcp:5173 tcp:8787 && npm run start -w @hinterview/desktop\"",
     "dev:web": "concurrently -k -n shared,server,renderer -c auto \"npm run watch -w @hinterview/shared\" \"npm run dev -w @hinterview/server\" \"npm run dev -w @hinterview/renderer\"",
     "test": "npm run test -w @hinterview/shared",
-    "release:check": "node scripts/release-check.mjs"
+    "release:check": "node scripts/release-check.mjs",
+    "pack:mac": "npm run build && electron-builder --mac dir --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --publish never"
+  },
+  "build": {
+    "appId": "com.tushargupta.hinterview",
+    "productName": "Hinterview",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "apps/desktop/dist/**/*",
+      "apps/desktop/src/assets/**/*",
+      "apps/desktop/src/native/**/*",
+      "apps/server/dist/**/*",
+      "apps/renderer/dist/**/*",
+      "packages/shared/dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "apps/desktop/dist/main.js"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "apps/desktop/build/icon.icns",
+      "artifactName": "Hinterview-${version}-${arch}.${ext}",
+      "hardenedRuntime": false
+    }
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "electron": "^35.1.4",
+    "electron-builder": "^24.13.3",
     "typescript": "^5.8.3",
     "wait-on": "^8.0.3"
   }
