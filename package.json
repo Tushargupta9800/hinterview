@@ -1,0 +1,26 @@
+{
+  "name": "hinterview",
+  "productName": "Hinterview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "npm run build -w @hinterview/shared && npm run build -w @hinterview/server && npm run build -w @hinterview/renderer && npm run build -w @hinterview/desktop",
+    "dev": "concurrently -k -n shared,server,renderer,desktop:watch,desktop -c auto \"npm run watch -w @hinterview/shared\" \"npm run dev -w @hinterview/server\" \"npm run dev -w @hinterview/renderer\" \"npm run watch -w @hinterview/desktop\" \"wait-on packages/shared/dist/index.js apps/desktop/dist/main.js tcp:5173 tcp:8787 && npm run start -w @hinterview/desktop\"",
+    "dev:web": "concurrently -k -n shared,server,renderer -c auto \"npm run watch -w @hinterview/shared\" \"npm run dev -w @hinterview/server\" \"npm run dev -w @hinterview/renderer\"",
+    "test": "npm run test -w @hinterview/shared",
+    "release:check": "node scripts/release-check.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3",
+    "wait-on": "^8.0.3"
+  }
+}

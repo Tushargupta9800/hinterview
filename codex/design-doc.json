@@ -1,0 +1,594 @@
+{
+  "documentType": "design-doc",
+  "name": "Hinterview Architecture",
+  "version": "1.0.0",
+  "status": "draft",
+  "lastUpdated": "2026-04-02",
+  "productIntent": {
+    "summary": "Desktop-first and web-capable HLD and LLD interview simulator with AI evaluation, diagramming, secure key storage, local speech-to-text, and structured question journeys.",
+    "keyDecision": "Use a shared web application with a desktop shell instead of trying to make Express.js itself the desktop runtime.",
+    "recommendedStack": {
+      "frontend": {
+        "framework": "React",
+        "language": "TypeScript",
+        "bundler": "Vite",
+        "routing": "React Router",
+        "ui": "Tailwind CSS plus custom component primitives",
+        "state": "Zustand",
+        "validation": "Zod shared across client and server",
+        "editor": "Plain text-first answer editor with optional richer formatting later",
+        "diagramming": "Excalidraw integration or a custom canvas wrapper around a scene model"
+      },
+      "backend": {
+        "runtime": "Node.js",
+        "framework": "Express.js",
+        "language": "TypeScript",
+        "validation": "Zod request/response schemas",
+        "apiStyle": "REST with selective streaming endpoints",
+        "jobs": "In-process queue for v1, upgradeable to background workers later"
+      },
+      "desktop": {
+        "shell": "Electron",
+        "distributionTarget": "macOS first",
+        "ipcBoundary": "Minimal desktop-only APIs exposed via preload"
+      },
+      "storage": {
+        "desktop": "SQLite for app data plus OS keychain or encrypted local secret storage",
+        "web": "PostgreSQL for user data plus server-side encrypted secret storage",
+        "blob": "Local filesystem on desktop, object storage on web for audio and exports"
+      }
+    }
+  },
+  "goals": [
+    "Support built-in and custom system design questions",
+    "Force ordered completion of interview stages while still showing the full journey",
+    "Collect user answer text, transcripts, diagram scene data, scores, and learnings",
+    "Support HLD and LLD practice modes under one shared problem catalog",
+    "Support multiple AI providers and models selected per session",
+    "Store user API keys securely",
+    "Ship one shared product across desktop and web"
+  ],
+  "nonGoals": [
+    "Collaborative real-time whiteboarding in v1",
+    "Multi-tenant organization management",
+    "Video mock interviews",
+    "Cloud speech-to-text in v1"
+  ],
+  "assumptions": [
+    "The app starts as a single-user product without mandatory auth in desktop mode.",
+    "Web mode may later require auth and hosted persistence.",
+    "Interview readiness is the scoring target, not production infrastructure accuracy.",
+    "Grammar, spelling, and shorthand endpoint notation should not materially affect scoring.",
+    "Questions must stay constrained to the scoped problem area and avoid drifting into unrelated subdomains.",
+    "Hint, answer, and scoring can all be provider-agnostic through one adapter layer."
+  ],
+  "personas": [
+    {
+      "name": "Practicing Candidate",
+      "needs": [
+        "Structured mock interview flow",
+        "Fast iteration",
+        "Constructive scoring",
+        "Persistent progress"
+      ]
+    },
+    {
+      "name": "Power User",
+      "needs": [
+        "Multiple model configurations",
+        "Custom prompts",
+        "Control over providers and keys"
+      ]
+    }
+  ],
+  "featureModules": [
+    {
+      "id": "settings.ai_agents",
+      "name": "AI Agent Settings",
+      "responsibilities": [
+        "Manage provider profiles",
+        "Validate API keys",
+        "Select default and active models",
+        "Store provider prompts and capability tags"
+      ]
+    },
+    {
+      "id": "questions.library",
+      "name": "Question Library",
+      "responsibilities": [
+        "Serve built-in curated prompts",
+        "Display metadata and progress",
+        "Load stage definitions and rubrics"
+      ]
+    },
+    {
+      "id": "questions.custom",
+      "name": "Custom Question Generator",
+      "responsibilities": [
+        "Accept user prompt",
+        "Generate structured interview stages",
+        "Generate HLD and LLD variants when applicable without duplicating the base problem record",
+        "Generate hints, answer expectations, and rubric"
+      ]
+    },
+    {
+      "id": "session.interview",
+      "name": "Interview Session Engine",
+      "responsibilities": [
+        "Track current stage",
+        "Track selected mode such as HLD or LLD",
+        "Enforce ordered completion",
+        "Track remaining tries per stage",
+        "Persist draft answers and diagram state",
+        "Trigger hint, answer, and scoring actions"
+      ]
+    },
+    {
+      "id": "canvas.diagram",
+      "name": "Diagram Canvas",
+      "responsibilities": [
+        "Capture HLD scene data and optional LLD diagrams",
+        "Autosave revisions",
+        "Export image and normalized diagram summary for AI"
+      ]
+    },
+    {
+      "id": "input.audio",
+      "name": "Audio and Transcription",
+      "responsibilities": [
+        "Record microphone input",
+        "Process audio locally for transcription",
+        "Store transcript and edited answer"
+      ]
+    },
+    {
+      "id": "evaluation.ai",
+      "name": "AI Evaluation Service",
+      "responsibilities": [
+        "Build stage-aware prompts",
+        "Keep prompts constrained to the declared problem focus",
+        "Generate hints",
+        "Generate reference answers",
+        "Score response and return coaching feedback",
+        "Synthesize cross-question learning insights"
+      ]
+    },
+    {
+      "id": "progress.learning",
+      "name": "Progress and Learning",
+      "responsibilities": [
+        "Store attempts and completion state",
+        "Aggregate learning insights",
+        "Support user-authored editable learning notes",
+        "Render review dashboards"
+      ]
+    }
+  ],
+  "primaryFlows": [
+    {
+      "name": "Start Built-In Interview",
+      "steps": [
+        "User opens question library",
+        "User selects question",
+        "User selects HLD or LLD mode when available",
+        "User selects AI agent/model",
+        "System creates interview session",
+        "Stage 1 unlocks and later stages remain read-only",
+        "User answers by text or audio and updates diagram",
+        "System saves progress continuously",
+        "User requests hint or answer if needed",
+        "User submits stage for evaluation",
+        "System decrements tries if score is 8 or below",
+        "System reveals the reference answer after max tries are exhausted",
+        "System unlocks next stage only after solve or forced reveal flow"
+      ]
+    },
+    {
+      "name": "Create Custom Question",
+      "steps": [
+        "User submits a raw system design prompt",
+        "AI generator builds stages, rubric, hints, answer outlines, difficulty, and focus areas",
+        "User reviews generated structure",
+        "System saves it into the question library",
+        "User starts a normal interview flow"
+      ]
+    },
+    {
+      "name": "Review Learning",
+      "steps": [
+        "System aggregates prior scoring data",
+        "AI produces generalized system design learning themes",
+        "User reviews themes in My Learning",
+        "User edits and adds personal learning notes",
+        "User revisits relevant prior attempts"
+      ]
+    }
+  ],
+  "dataModel": {
+    "entities": [
+      {
+        "name": "AgentProfile",
+        "fields": [
+          "id",
+          "name",
+          "provider",
+          "model",
+          "systemPrompt",
+          "capabilities",
+          "apiKeyId",
+          "isDefault",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "SecretCredential",
+        "fields": [
+          "id",
+          "provider",
+          "encryptedValue",
+          "encryptionMetadata",
+          "lastValidatedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "Question",
+        "fields": [
+          "id",
+          "sourceType",
+          "title",
+          "slug",
+          "prompt",
+          "difficulty",
+          "focusArea",
+          "supportsHld",
+          "supportsLld",
+          "tags",
+          "estimatedMinutes",
+          "status",
+          "generatedByAgentId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "QuestionStage",
+        "fields": [
+          "id",
+          "questionId",
+          "mode",
+          "orderIndex",
+          "stageType",
+          "title",
+          "instructions",
+          "isCoreFocus",
+          "maxTries",
+          "hintTemplate",
+          "answerOutline",
+          "rubric",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "InterviewSession",
+        "fields": [
+          "id",
+          "questionId",
+          "agentProfileId",
+          "mode",
+          "status",
+          "currentStageOrder",
+          "startedAt",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "StageAttempt",
+        "fields": [
+          "id",
+          "sessionId",
+          "stageId",
+          "tryNumber",
+          "remainingTries",
+          "status",
+          "rawTranscript",
+          "finalAnswerText",
+          "diagramSceneJson",
+          "diagramSummaryText",
+          "audioAssetPath",
+          "score",
+          "feedbackJson",
+          "hintHistoryJson",
+          "answerViewed",
+          "forcedReveal",
+          "submittedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      {
+        "name": "LearningInsight",
+        "fields": [
+          "id",
+          "source",
+          "theme",
+          "summary",
+          "userEditable",
+          "evidenceJson",
+          "confidence",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    ],
+    "relationships": [
+      "Question has many QuestionStage across HLD and LLD modes without duplicating the base problem",
+      "InterviewSession belongs to Question and AgentProfile",
+      "InterviewSession has many StageAttempt",
+      "AgentProfile references one SecretCredential",
+      "LearningInsight aggregates across many StageAttempt records"
+    ]
+  },
+  "apiDesign": {
+    "restEndpoints": [
+      {
+        "method": "GET",
+        "path": "/api/questions",
+        "purpose": "List built-in and custom questions with progress summary, difficulty, focus area, and mode availability"
+      },
+      {
+        "method": "POST",
+        "path": "/api/questions/custom",
+        "purpose": "Generate and persist a structured custom question"
+      },
+      {
+        "method": "GET",
+        "path": "/api/questions/:questionId",
+        "purpose": "Fetch question metadata and ordered stages for HLD or LLD mode"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions",
+        "purpose": "Create an interview session for a question, selected mode, and selected agent"
+      },
+      {
+        "method": "GET",
+        "path": "/api/sessions/:sessionId",
+        "purpose": "Fetch session progress and stage states"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/sessions/:sessionId/stages/:stageId/draft",
+        "purpose": "Autosave draft answer and diagram state"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/:sessionId/stages/:stageId/hint",
+        "purpose": "Generate a hint for the current stage"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/:sessionId/stages/:stageId/answer",
+        "purpose": "Return the reference answer for the current stage"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/:sessionId/stages/:stageId/submit",
+        "purpose": "Score the current stage, update tries, and unlock the next one if solved or completed through reveal flow"
+      },
+      {
+        "method": "POST",
+        "path": "/api/audio/transcribe",
+        "purpose": "Convert recorded audio into transcript text locally on device"
+      },
+      {
+        "method": "GET",
+        "path": "/api/settings/agents",
+        "purpose": "List configured agent profiles"
+      },
+      {
+        "method": "POST",
+        "path": "/api/settings/agents",
+        "purpose": "Create or update agent profiles"
+      },
+      {
+        "method": "POST",
+        "path": "/api/settings/secrets",
+        "purpose": "Store encrypted provider credentials"
+      },
+      {
+        "method": "GET",
+        "path": "/api/learning",
+        "purpose": "Fetch generalized and user-authored learning insights"
+      },
+      {
+        "method": "POST",
+        "path": "/api/learning",
+        "purpose": "Create a user-authored learning note"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/learning/:learningId",
+        "purpose": "Edit a user-authored or user-curated learning note"
+      }
+    ]
+  },
+  "providerAbstraction": {
+    "interface": {
+      "methods": [
+        "validateCredentials",
+        "generateStructuredQuestion",
+        "generateHint",
+        "generateReferenceAnswer",
+        "scoreStageResponse",
+        "synthesizeLearningInsights"
+      ]
+    },
+    "initialProviders": [
+      "OpenAI",
+      "Anthropic"
+    ],
+    "selectionModel": "Each session binds to one active agent profile, but settings may define many."
+  },
+  "evaluationDesign": {
+    "inputs": [
+      "Question prompt",
+      "Problem focus area",
+      "Current stage instructions",
+      "Stage rubric",
+      "User final answer text",
+      "Transcript if audio was used",
+      "Diagram scene summary and optional export image",
+      "History of earlier completed stages"
+    ],
+    "outputs": [
+      "scoreOutOf10",
+      "whatWentWell",
+      "whatNeedsImprovement",
+      "suggestedNextFocus",
+      "interviewReadinessAssessment",
+      "isSolved"
+    ],
+    "principles": [
+      "Reward clarity, prioritization, and interview communication",
+      "Do not penalize grammar, spelling, or shorthand notation when intent is clear",
+      "Avoid penalizing lack of production-detail depth unless it blocks correctness",
+      "Keep evaluation constrained to the question scope and declared focus area",
+      "Use stage-specific scoring rubrics",
+      "Keep feedback concrete and bounded"
+    ]
+  },
+  "security": {
+    "requirements": [
+      "Never store plaintext API keys in app logs",
+      "Encrypt stored secrets at rest",
+      "Desktop mode should prefer OS keychain access",
+      "If keychain is unavailable, use envelope encryption with a machine/user bound secret",
+      "Web mode must keep secrets server-side only",
+      "Prompt payloads should avoid sending unnecessary personal metadata",
+      "Raw audio must never be sent to AI providers"
+    ],
+    "desktopApproach": {
+      "preferred": "Keytar or native keychain binding for provider API keys",
+      "fallback": "AES-GCM encrypted value stored in SQLite with key material derived from a local secure secret plus app salt"
+    },
+    "webApproach": {
+      "preferred": "KMS-backed encryption for stored secrets on the server",
+      "browserRule": "Do not persist raw provider keys in browser localStorage or IndexedDB"
+    }
+  },
+  "desktopWebStrategy": {
+    "sharedLayers": [
+      "UI components",
+      "Question/session domain logic",
+      "Validation schemas",
+      "Provider adapters",
+      "Prompt builders"
+    ],
+    "desktopOnlyLayers": [
+      "OS keychain integration",
+      "Filesystem-backed audio/blob storage",
+      "Electron shell and IPC bridge"
+    ],
+    "webOnlyLayers": [
+      "Authentication",
+      "Hosted database",
+      "Object storage integration"
+    ],
+    "localAiAdjacencies": [
+      "On-device speech-to-text runtime or model binding"
+    ]
+  },
+  "stateManagement": {
+    "clientState": [
+      "activeQuestion",
+      "activeSession",
+      "currentStage",
+      "selectedMode",
+      "draftAnswer",
+      "diagramScene",
+      "selectedAgent",
+      "remainingTries"
+    ],
+    "serverState": [
+      "questions",
+      "sessionProgress",
+      "settings",
+      "learningInsights"
+    ],
+    "library": "Zustand",
+    "schemaLayer": "Zod schemas shared between renderer, server, and Electron boundaries where possible",
+    "autosavePolicy": {
+      "answerDraft": "debounced every few seconds and on blur",
+      "diagramScene": "on change with throttling",
+      "recovery": "resume latest incomplete session automatically"
+    }
+  },
+  "milestoneMapping": [
+    {
+      "milestone": "M1 Foundation",
+      "covers": [
+        "Repo setup with React + TypeScript + Vite renderer",
+        "Shared app shell",
+        "Express API baseline",
+        "Desktop packaging skeleton",
+        "Tailwind baseline",
+        "Zustand store baseline",
+        "Zod schema baseline",
+        "Persistence baseline"
+      ]
+    },
+    {
+      "milestone": "M2 Question Flow",
+      "covers": [
+        "Built-in question library",
+        "HLD and LLD mode selection on shared problems",
+        "Ordered interview stages",
+        "Problem-focused stage generation instead of boilerplate templates",
+        "Draft persistence",
+        "Basic progress tracking"
+      ]
+    },
+    {
+      "milestone": "M3 AI Settings and Evaluation",
+      "covers": [
+        "Multiple provider settings",
+        "Encrypted key storage",
+        "Hints",
+        "Answers",
+        "Scoring"
+      ]
+    },
+    {
+      "milestone": "M4 Diagram and Audio",
+      "covers": [
+        "Diagram canvas",
+        "Audio recording",
+        "Local speech-to-text",
+        "Diagram-aware evaluation"
+      ]
+    },
+    {
+      "milestone": "M5 Learning and Custom Questions",
+      "covers": [
+        "My Learning",
+        "Editable user learnings",
+        "Custom prompt generation",
+        "Refinement and polish"
+      ]
+    }
+  ],
+  "openQuestions": [
+    "Should web mode support bring-your-own-key or only platform-managed keys?",
+    "Should scoring happen after every stage or optionally after the full question as well?",
+    "How much Excalidraw parity is necessary for v1 versus embedding the library directly?",
+    "Should hints consume a limited budget per question?",
+    "Should custom question generation be editable before first use?",
+    "Which local speech-to-text dependency gives the best balance of macOS packaging size and acceptable latency?"
+  ]
+}
