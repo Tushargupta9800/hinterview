@@ -64,50 +64,41 @@ It gives you:
 
 ### Product Gallery
 
-<table>
-  <tr>
-    <td align="center">
-      <div><strong>Question Library</strong></div>
-      <img src="./screenshots/library.png" alt="Question library" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>Question Detail</strong></div>
-      <img src="./screenshots/question-detail.png" alt="Question detail" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>Playground and Evaluation</strong></div>
-      <img src="./screenshots/playground-evaluation.png" alt="Playground and evaluation" width="320" />
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <div><strong>Shared Question Flow</strong></div>
-      <img src="./screenshots/shared-question-flow.png" alt="Shared question flow" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>My Learning</strong></div>
-      <img src="./screenshots/my-learning.png" alt="My learning" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>Learning Themes and Notes</strong></div>
-      <img src="./screenshots/learning-themes-notes.png" alt="Learning themes and notes" width="320" />
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <div><strong>Settings and Agent Profiles</strong></div>
-      <img src="./screenshots/settings-agent-profiles.png" alt="Settings and agent profiles" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>Custom Question Flow</strong></div>
-      <img src="./screenshots/custom-question-flow.png" alt="Custom question flow" width="320" />
-    </td>
-    <td align="center">
-      <div><strong>Dark Mode</strong></div>
-      <img src="./screenshots/dark-mode.png" alt="Dark mode" width="320" />
-    </td>
-  </tr>
-</table>
+#### Question Library
+
+<img src="./screenshots/library.png" alt="Question library" width="960" />
+
+#### Question Detail
+
+<img src="./screenshots/question-detail.png" alt="Question detail" width="960" />
+
+#### Playground and Evaluation
+
+<img src="./screenshots/playground-evaluation.png" alt="Playground and evaluation" width="960" />
+
+#### Shared Question Flow
+
+<img src="./screenshots/shared-question-flow.png" alt="Shared question flow" width="960" />
+
+#### My Learning
+
+<img src="./screenshots/my-learning.png" alt="My learning" width="960" />
+
+#### Learning Themes and Notes
+
+<img src="./screenshots/learning-themes-notes.png" alt="Learning themes and notes" width="960" />
+
+#### Settings and Agent Profiles
+
+<img src="./screenshots/settings-agent-profiles.png" alt="Settings and agent profiles" width="960" />
+
+#### Custom Question Flow
+
+<img src="./screenshots/custom-question-flow.png" alt="Custom question flow" width="960" />
+
+#### Dark Mode
+
+<img src="./screenshots/dark-mode.png" alt="Dark mode" width="960" />
 
 ## 🏗️ Workspace
 
