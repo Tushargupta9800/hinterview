@@ -70,11 +70,11 @@ It gives you:
 
 <img src="./screenshots/library.png" alt="Question library" width="960" />
 
-#### Question Detail
+#### My Learnings
 
 <img src="./screenshots/question-detail.png" alt="Question detail" width="960" />
 
-#### Playground and Evaluation
+#### Question Detail
 
 <img src="./screenshots/playground-evaluation.png" alt="Playground and evaluation" width="960" />
 
@@ -82,7 +82,7 @@ It gives you:
 
 <img src="./screenshots/shared-question-flow.png" alt="Shared question flow" width="960" />
 
-#### My Learning
+#### Playground
 
 <img src="./screenshots/my-learning.png" alt="My learning" width="960" />
 
@@ -90,7 +90,7 @@ It gives you:
 
 <img src="./screenshots/learning-themes-notes.png" alt="Learning themes and notes" width="960" />
 
-#### Settings and Agent Profiles
+#### Create a new question
 
 <img src="./screenshots/settings-agent-profiles.png" alt="Settings and agent profiles" width="960" />
 
@@ -101,6 +101,10 @@ It gives you:
 #### LIGHT Mode
 
 <img src="./screenshots/dark-mode.png" alt="Dark mode" width="960" />
+
+#### Ask AI
+
+<img src="./screenshots/ask-ai.png" alt="Dark mode" width="960" />
 
 ## 🏗️ Workspace
 

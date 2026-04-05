@@ -360,7 +360,10 @@ export function QuestionPage() {
     [activeSessionForMode?.stages]
   );
   const leftRailExpanded = !leftRailCollapsed || leftRailHoverOpen;
-  const shouldShowTopStagePreview = leftRailHoverOpen || (leftRailHovering && !leftRailCollapsed && !headerVisible);
+  const shouldShowTopStagePreview =
+    selectedPanel !== "question-details" &&
+    !headerVisible &&
+    (leftRailHoverOpen || (leftRailHovering && !leftRailCollapsed));
 
   useEffect(() => {
     const container = rightSectionRef.current;
