@@ -124,6 +124,34 @@ export const questionStageSuggestionSchema = z.object({
   sampleQuestion: z.string().min(1).max(4000)
 });
 
+export const questionChatMessageRoleSchema = z.enum(["user", "assistant"]);
+
+export const questionChatMessageSchema = z.object({
+  id: z.string(),
+  questionSlug: z.string(),
+  mode: interviewModeSchema,
+  role: questionChatMessageRoleSchema,
+  content: z.string().min(1).max(12000),
+  createdAt: z.string()
+});
+
+export const questionChatHistorySchema = z.object({
+  questionSlug: z.string(),
+  mode: interviewModeSchema,
+  items: z.array(questionChatMessageSchema)
+});
+
+export const questionChatRequestSchema = z.object({
+  mode: interviewModeSchema,
+  message: z.string().min(1).max(4000)
+});
+
+export const questionChatResponseSchema = z.object({
+  userMessage: questionChatMessageSchema,
+  assistantMessage: questionChatMessageSchema,
+  history: questionChatHistorySchema
+});
+
 export const appSettingsSchema = z.object({
   defaultMaxTries: z.number().int().min(1).max(10),
   defaultAgentId: z.string().nullable().default(null),
@@ -458,6 +486,10 @@ export type QuestionDraft = z.infer<typeof questionDraftSchema>;
 export type QuestionAuthoringInput = z.infer<typeof questionAuthoringInputSchema>;
 export type QuestionStageAuthoringInput = z.infer<typeof questionStageAuthoringInputSchema>;
 export type QuestionStageSuggestion = z.infer<typeof questionStageSuggestionSchema>;
+export type QuestionChatMessage = z.infer<typeof questionChatMessageSchema>;
+export type QuestionChatHistory = z.infer<typeof questionChatHistorySchema>;
+export type QuestionChatRequest = z.infer<typeof questionChatRequestSchema>;
+export type QuestionChatResponse = z.infer<typeof questionChatResponseSchema>;
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type StageProgress = z.infer<typeof stageProgressSchema>;
 export type InterviewSession = z.infer<typeof interviewSessionSchema>;

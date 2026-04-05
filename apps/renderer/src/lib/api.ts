@@ -12,6 +12,9 @@ import {
   learningNoteSchema,
   promptScaffoldBundleSchema,
   questionAuthoringInputSchema,
+  questionChatHistorySchema,
+  questionChatRequestSchema,
+  questionChatResponseSchema,
   questionDetailSchema,
   questionDraftSchema,
   questionStageAuthoringInputSchema,
@@ -38,6 +41,9 @@ import {
   type LearningNoteInput,
   type PromptScaffoldBundle,
   type QuestionAuthoringInput,
+  type QuestionChatHistory,
+  type QuestionChatRequest,
+  type QuestionChatResponse,
   type QuestionDetail,
   type QuestionDraft,
   type QuestionStageAuthoringInput,
@@ -294,6 +300,23 @@ export const fetchQuestions = async (): Promise<QuestionSummary[]> => {
 export const fetchQuestion = async (slug: string): Promise<QuestionDetail> => {
   const response = await fetchWithRetry(buildUrl(`/api/questions/${slug}`));
   return parseJson(response, (value) => questionDetailSchema.parse(value));
+};
+
+export const fetchQuestionChatHistory = async (slug: string, mode: InterviewMode): Promise<QuestionChatHistory> => {
+  const response = await fetchWithRetry(buildUrl(`/api/questions/${slug}/chat?mode=${mode}`));
+  return parseJson(response, (value) => questionChatHistorySchema.parse(value));
+};
+
+export const sendQuestionChatMessage = async (slug: string, input: QuestionChatRequest): Promise<QuestionChatResponse> => {
+  const response = await fetch(buildUrl(`/api/questions/${slug}/chat`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(questionChatRequestSchema.parse(input))
+  });
+
+  return parseJson(response, (value) => questionChatResponseSchema.parse(value));
 };
 
 export const createQuestionDraft = async (input: QuestionAuthoringInput): Promise<QuestionDraft> => {

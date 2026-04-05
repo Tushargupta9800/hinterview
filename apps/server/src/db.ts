@@ -31,6 +31,10 @@ import {
   learningDashboardSchema,
   learningItemInputSchema,
   learningNoteInputSchema,
+  questionChatHistorySchema,
+  questionChatMessageSchema,
+  questionChatRequestSchema,
+  questionChatResponseSchema,
   type AgentProfile,
   type AgentProfileInput,
   type AgentValidation,
@@ -48,6 +52,10 @@ import {
   type QuestionStageAuthoringInput,
   type QuestionStage,
   type QuestionStageSuggestion,
+  type QuestionChatHistory,
+  type QuestionChatMessage,
+  type QuestionChatRequest,
+  type QuestionChatResponse,
   type QuestionSummary,
   type SessionRequest,
   type StageAnswer,
@@ -196,6 +204,15 @@ database.exec(`
     summary TEXT NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS question_chat_messages (
+    id TEXT PRIMARY KEY,
+    question_slug TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -416,6 +433,15 @@ type LearningItemOverrideRow = {
   summary: string;
   deleted: number;
   updated_at: string;
+};
+
+type QuestionChatMessageRow = {
+  id: string;
+  question_slug: string;
+  mode: InterviewMode;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
 };
 
 const defaultSettings: AppSettings = {
@@ -2307,6 +2333,154 @@ export const suggestQuestionStageWithAi = async (
       : `What important ${mode.toUpperCase()} stage is still missing for ${question.title}?`;
 
   return questionStageSuggestionSchema.parse({ sampleQuestion });
+};
+
+const toQuestionChatMessage = (row: QuestionChatMessageRow): QuestionChatMessage =>
+  questionChatMessageSchema.parse({
+    id: row.id,
+    questionSlug: row.question_slug,
+    mode: row.mode,
+    role: row.role,
+    content: row.content,
+    createdAt: row.created_at
+  });
+
+const listQuestionChatRows = (questionSlug: string, mode: InterviewMode): QuestionChatMessageRow[] =>
+  database
+    .prepare(
+      `SELECT *
+       FROM question_chat_messages
+       WHERE question_slug = ? AND mode = ?
+       ORDER BY datetime(created_at) ASC, id ASC`
+    )
+    .all(questionSlug, mode) as QuestionChatMessageRow[];
+
+export const getQuestionChatHistory = (questionSlug: string, mode: InterviewMode): QuestionChatHistory => {
+  const question = getQuestionBySlugInternal(questionSlug);
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  if (!question.supportedModes.includes(mode)) {
+    throw new Error("This question does not support the selected mode");
+  }
+
+  return questionChatHistorySchema.parse({
+    questionSlug,
+    mode,
+    items: listQuestionChatRows(questionSlug, mode).map(toQuestionChatMessage)
+  });
+};
+
+const buildQuestionChatPrompt = (
+  question: QuestionDetail,
+  mode: InterviewMode,
+  history: QuestionChatMessage[],
+  userMessage: string
+) => {
+  const recentHistory = history.slice(-12).map((message) => ({
+    r: message.role,
+    c: message.content
+  }));
+
+  const contextPayload = JSON.stringify({
+    q: question.title,
+    m: mode,
+    s: question.summary,
+    d: question.detailedDescription,
+    a: question.assumptions,
+    qps: question.qpsAssumptions,
+    in: question.inScope,
+    out: question.outOfScope,
+    f: question.focusPoints,
+    st: question.stages
+      .filter((stage) => stage.mode === mode)
+      .sort((left, right) => left.orderIndex - right.orderIndex)
+      .map((stage) => ({ i: stage.orderIndex, t: stage.title, p: stage.prompt })),
+    h: recentHistory,
+    u: userMessage
+  });
+
+  return [
+    "You are helping with follow-up questions for one system-design interview problem.",
+    "Answer only in the context of the current question and current mode.",
+    "Do not drift into unrelated systems, product ideas, or a different interview problem.",
+    "Answer precisely what the user asked. Do not answer a broader question than the one asked.",
+    "Use simple English and technical terms. Keep the answer practical and interview-focused.",
+    "Keep the answer brief but not too brief. Target about 80 to 180 words unless the user explicitly asks for more depth.",
+    "Prefer direct bullets or short paragraphs over long explanations.",
+    "If the user asks something outside this question's scope, redirect them back to the current question context.",
+    "Return only valid JSON with shape {\"answer\":\"string\"}.",
+    contextPayload
+  ].join("\n\n");
+};
+
+export const askQuestionChat = async (
+  questionSlug: string,
+  inputValue: QuestionChatRequest
+): Promise<QuestionChatResponse> => {
+  const input = questionChatRequestSchema.parse(inputValue);
+  const question = getQuestionBySlugInternal(questionSlug);
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  if (!question.supportedModes.includes(input.mode)) {
+    throw new Error("This question does not support the selected mode");
+  }
+
+  const sessionRow = getPreferredSessionRow(questionSlug, input.mode);
+  const session = sessionRow ? hydrateSession(sessionRow.id) : null;
+  const agent = session ? requireSessionAgent(session) : getDefaultAgentProfileOrThrow();
+  const secret = getSecretCredentialForProfile(agent.credentialId);
+  const history = getQuestionChatHistory(questionSlug, input.mode).items;
+  const response = await invokeProviderJson(
+    agent,
+    decryptSecret(secret),
+    "answer",
+    ["You answer follow-up questions about one interview problem.", "Return raw JSON only.", agent.systemPrompt.trim()]
+      .filter(Boolean)
+      .join("\n\n"),
+    buildQuestionChatPrompt(question, input.mode, history, input.message.trim())
+  );
+  const parsed = stageAnswerSchema.omit({ stageId: true, session: true }).parse(response);
+  const now = new Date().toISOString();
+  const userMessage = toQuestionChatMessage({
+    id: randomUUID(),
+    question_slug: questionSlug,
+    mode: input.mode,
+    role: "user",
+    content: input.message.trim(),
+    created_at: now
+  });
+  const assistantMessage = toQuestionChatMessage({
+    id: randomUUID(),
+    question_slug: questionSlug,
+    mode: input.mode,
+    role: "assistant",
+    content: parsed.answer.trim(),
+    created_at: new Date().toISOString()
+  });
+
+  const insert = database.prepare(
+    `INSERT INTO question_chat_messages (id, question_slug, mode, role, content, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  );
+  insert.run(userMessage.id, userMessage.questionSlug, userMessage.mode, userMessage.role, userMessage.content, userMessage.createdAt);
+  insert.run(
+    assistantMessage.id,
+    assistantMessage.questionSlug,
+    assistantMessage.mode,
+    assistantMessage.role,
+    assistantMessage.content,
+    assistantMessage.createdAt
+  );
+
+  return questionChatResponseSchema.parse({
+    userMessage,
+    assistantMessage,
+    history: getQuestionChatHistory(questionSlug, input.mode)
+  });
 };
 
 export const addStageToQuestion = (questionSlug: string, draftValue: QuestionStageDraft): QuestionDetail => {

@@ -12,6 +12,9 @@ import {
   learningItemInputSchema,
   learningNoteInputSchema,
   learningNoteSchema,
+  questionChatHistorySchema,
+  questionChatRequestSchema,
+  questionChatResponseSchema,
   questionAuthoringInputSchema,
   questionDetailSchema,
   questionDraftSchema,
@@ -32,6 +35,7 @@ import {
   createOrResumeSession,
   deleteAgentProfile,
   getPromptScaffoldBundle,
+  getQuestionChatHistory,
   getStageAnswer,
   listStageEvaluations,
   getStageHint,
@@ -49,6 +53,7 @@ import {
   deleteLearningItemOverride,
   getAppMeta,
   suggestQuestionStageWithAi,
+  askQuestionChat,
   syncSharedStageData,
   submitStageAnswer,
   recordTelemetryEvent,
@@ -192,6 +197,31 @@ export const createApp = () => {
     }
 
     response.json(question);
+  });
+
+  app.get("/api/questions/:slug/chat", (request, response) => {
+    try {
+      const mode = typeof request.query.mode === "string" ? request.query.mode : "";
+      if (mode !== "hld" && mode !== "lld") {
+        response.status(400).json({ message: "A valid mode is required." });
+        return;
+      }
+
+      response.json(questionChatHistorySchema.parse(getQuestionChatHistory(request.params.slug, mode)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load question chat";
+      response.status(400).json({ message });
+    }
+  });
+
+  app.post("/api/questions/:slug/chat", async (request, response) => {
+    try {
+      const payload = questionChatRequestSchema.parse(request.body);
+      response.json(questionChatResponseSchema.parse(await askQuestionChat(request.params.slug, payload)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to ask AI about this question";
+      response.status(400).json({ message });
+    }
   });
 
   app.post("/api/questions/drafts", (request, response) => {

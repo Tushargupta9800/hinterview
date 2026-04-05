@@ -1,8 +1,15 @@
-import type { InterviewMode, PlaygroundScene, QuestionStage, QuestionStageDraft, StageProgress } from "@hinterview/shared";
+import type { InterviewMode, PlaygroundScene, QuestionChatMessage, QuestionStage, QuestionStageDraft, StageProgress } from "@hinterview/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { InterviewPlayground } from "../components/InterviewPlayground";
-import { beautifyQuestionStageDraft, saveQuestionStageDraft, suggestQuestionStage, trackTelemetry } from "../lib/api";
+import {
+  beautifyQuestionStageDraft,
+  fetchQuestionChatHistory,
+  saveQuestionStageDraft,
+  sendQuestionChatMessage,
+  suggestQuestionStage,
+  trackTelemetry
+} from "../lib/api";
 import { buildStagePlaygroundAnswer, getPlaygroundStorageKey, mergeSceneWithStages } from "../lib/playground";
 import { useAppStore } from "../store/appStore";
 
@@ -96,8 +103,14 @@ export function QuestionPage() {
   const [relatedDraft, setRelatedDraft] = useState<QuestionStageDraft | null>(null);
   const [relatedQuestionError, setRelatedQuestionError] = useState<string | null>(null);
   const [relatedQuestionBusy, setRelatedQuestionBusy] = useState<"suggest" | "beautify" | "save" | null>(null);
+  const [questionChatOpen, setQuestionChatOpen] = useState(false);
+  const [questionChatMessages, setQuestionChatMessages] = useState<QuestionChatMessage[]>([]);
+  const [questionChatInput, setQuestionChatInput] = useState("");
+  const [questionChatLoading, setQuestionChatLoading] = useState(false);
+  const [questionChatError, setQuestionChatError] = useState<string | null>(null);
   const rightSectionRef = useRef<HTMLElement | null>(null);
   const rightHeaderRef = useRef<HTMLDivElement | null>(null);
+  const questionChatBodyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (slug && currentQuestion?.slug !== slug) {
@@ -441,6 +454,56 @@ export function QuestionPage() {
       setRelatedQuestionBusy(null);
     }
   };
+
+  const openQuestionChat = async () => {
+    if (!currentQuestion || !selectedMode) {
+      return;
+    }
+
+    setQuestionChatOpen(true);
+    setQuestionChatLoading(true);
+    setQuestionChatError(null);
+
+    try {
+      const history = await fetchQuestionChatHistory(currentQuestion.slug, selectedMode);
+      setQuestionChatMessages(history.items);
+    } catch (error) {
+      setQuestionChatError(error instanceof Error ? error.message : "Failed to load question chat.");
+    } finally {
+      setQuestionChatLoading(false);
+    }
+  };
+
+  const askQuestionChat = async () => {
+    if (!currentQuestion || !selectedMode || !questionChatInput.trim() || questionChatLoading) {
+      return;
+    }
+
+    setQuestionChatLoading(true);
+    setQuestionChatError(null);
+
+    try {
+      const response = await sendQuestionChatMessage(currentQuestion.slug, {
+        mode: selectedMode,
+        message: questionChatInput.trim()
+      });
+      setQuestionChatMessages(response.history.items);
+      setQuestionChatInput("");
+    } catch (error) {
+      setQuestionChatError(error instanceof Error ? error.message : "Failed to ask AI.");
+    } finally {
+      setQuestionChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!questionChatOpen || !questionChatBodyRef.current) {
+      return;
+    }
+
+    questionChatBodyRef.current.scrollTop = questionChatBodyRef.current.scrollHeight;
+  }, [questionChatMessages, questionChatOpen]);
+
   if (!bootLoading && agentProfiles.length === 0) {
     return <Navigate replace to="/settings" />;
   }
@@ -802,6 +865,14 @@ export function QuestionPage() {
                   >
                     <span className="text-lg leading-none">+</span>
                     <span>Add related question</span>
+                  </button>
+                  <button
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-brand-teal/40 hover:text-white"
+                    onClick={() => void openQuestionChat()}
+                    type="button"
+                  >
+                    <span className="text-base leading-none">✦</span>
+                    <span>Ask AI</span>
                   </button>
                 </section>
               </div>
@@ -1281,6 +1352,92 @@ export function QuestionPage() {
               >
                 {relatedQuestionBusy === "save" ? "Adding..." : "Add stage"}
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    {questionChatOpen ? (
+      <div
+        aria-labelledby="question-chat-title"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-sm"
+        role="dialog"
+      >
+        <div className="flex h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-card">
+          <div className="flex items-center justify-between border-b border-slate-200 px-8 py-5">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-brand-teal">Question AI</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-brand-ink" id="question-chat-title">
+                Ask about {currentQuestion.title}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Ask anything related to this current question only. The full conversation is saved for this question and mode.
+              </p>
+            </div>
+            <button
+              aria-label="Close question AI dialog"
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-brand-ink"
+              onClick={() => setQuestionChatOpen(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6" ref={questionChatBodyRef}>
+            {questionChatLoading && questionChatMessages.length === 0 ? (
+              <div className="rounded-[1.2rem] border border-brand-line bg-brand-surface px-4 py-3 text-sm text-slate-600">
+                Loading conversation...
+              </div>
+            ) : questionChatMessages.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-dashed border-brand-line bg-brand-surface px-8 py-10 text-center text-sm leading-6 text-slate-500">
+                Ask about requirements, APIs, entities, design choices, tradeoffs, or scaling for this question. AI will stay scoped to this question and current mode.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {questionChatMessages.map((message) => (
+                  <div
+                    className={`max-w-[85%] rounded-[1.3rem] px-4 py-3 text-sm leading-6 ${
+                      message.role === "user"
+                        ? "ml-auto bg-brand-ink text-white"
+                        : "border border-brand-line bg-brand-surface text-brand-ink"
+                    }`}
+                    key={message.id}
+                  >
+                    <div className={`mb-1 text-[11px] uppercase tracking-[0.16em] ${message.role === "user" ? "text-slate-300" : "text-slate-400"}`}>
+                      {message.role === "user" ? "You" : "AI"}
+                    </div>
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {questionChatError ? (
+              <div className="mt-4 rounded-[1rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {questionChatError}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="border-t border-slate-200 px-8 py-5">
+            <div className="flex gap-3">
+              <textarea
+                className="min-h-[92px] flex-1 rounded-[1rem] border border-brand-line bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-ink outline-none transition focus:border-brand-teal"
+                onChange={(event) => setQuestionChatInput(event.target.value)}
+                placeholder="Ask a follow-up question about the current interview problem..."
+                value={questionChatInput}
+              />
+              <div className="flex items-end">
+                <button
+                  className="rounded-full bg-brand-ink px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#102232] disabled:bg-slate-300"
+                  disabled={!questionChatInput.trim() || questionChatLoading}
+                  onClick={() => void askQuestionChat()}
+                  type="button"
+                >
+                  {questionChatLoading ? "Asking..." : "Send"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
