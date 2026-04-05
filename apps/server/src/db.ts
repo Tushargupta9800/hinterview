@@ -420,7 +420,8 @@ type LearningItemOverrideRow = {
 
 const defaultSettings: AppSettings = {
   defaultMaxTries: 3,
-  defaultAgentId: null
+  defaultAgentId: null,
+  sequentialStageFlow: true
 };
 
 if (!fs.existsSync(encryptionKeyPath)) {
@@ -1974,7 +1975,8 @@ export const getSettings = (): AppSettings => {
   const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
   return appSettingsSchema.parse({
     defaultMaxTries: Number(values.defaultMaxTries ?? defaultSettings.defaultMaxTries),
-    defaultAgentId: values.defaultAgentId ? String(values.defaultAgentId) : null
+    defaultAgentId: values.defaultAgentId ? String(values.defaultAgentId) : null,
+    sequentialStageFlow: values.sequentialStageFlow ? values.sequentialStageFlow === "true" : defaultSettings.sequentialStageFlow
   });
 };
 
@@ -2042,6 +2044,7 @@ export const updateSettings = (input: AppSettings): AppSettings => {
     }
   }
   update.run("defaultAgentId", settings.defaultAgentId ?? "");
+  update.run("sequentialStageFlow", String(settings.sequentialStageFlow));
   return getSettings();
 };
 
@@ -2720,7 +2723,7 @@ export const getStageAnswer = async (sessionId: string, stageId: string): Promis
     throw new Error("Stage not found");
   }
 
-  if (row.status === "locked") {
+  if (row.status === "locked" && getSettings().sequentialStageFlow) {
     throw new Error("This stage is still locked");
   }
 
@@ -3114,7 +3117,7 @@ export const updateStageDraft = (sessionId: string, stageId: string, body: Draft
     throw new Error("Stage not found");
   }
 
-  if (row.status === "locked") {
+  if (row.status === "locked" && getSettings().sequentialStageFlow) {
     throw new Error("Cannot edit a locked stage");
   }
 
@@ -3143,7 +3146,7 @@ export const submitStageAnswer = async (sessionId: string, stageId: string): Pro
   const stage = toStageProgress(row);
   const stageDefinition = getQuestionStageDefinition(sessionId, stageId);
 
-  if (stage.status === "locked") {
+  if (stage.status === "locked" && getSettings().sequentialStageFlow) {
     throw new Error("This stage is still locked");
   }
 

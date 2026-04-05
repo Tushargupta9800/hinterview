@@ -43,6 +43,7 @@ export function SettingsModal() {
   const [section, setSection] = useState<SettingsSection>("general");
   const [triesInput, setTriesInput] = useState(settings?.defaultMaxTries ?? 3);
   const [defaultAgentId, setDefaultAgentId] = useState<string>(settings?.defaultAgentId ?? "");
+  const [sequentialStageFlow, setSequentialStageFlow] = useState(settings?.sequentialStageFlow ?? true);
   const [profileName, setProfileName] = useState("");
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [model, setModel] = useState("");
@@ -51,11 +52,19 @@ export function SettingsModal() {
   const [agentSaving, setAgentSaving] = useState(false);
   const isSettingsRoute = location.pathname === "/settings";
   const suggestedModels = providerModels[provider];
+  const normalizedTriesInput = Math.min(10, Math.max(1, triesInput));
+  const generalSettingsDirty = Boolean(
+    settings &&
+      (normalizedTriesInput !== settings.defaultMaxTries ||
+        (defaultAgentId || null) !== (settings.defaultAgentId ?? null) ||
+        sequentialStageFlow !== settings.sequentialStageFlow)
+  );
 
   useEffect(() => {
     if (settings) {
       setTriesInput(settings.defaultMaxTries);
       setDefaultAgentId(settings.defaultAgentId ?? "");
+      setSequentialStageFlow(settings.sequentialStageFlow);
     }
   }, [settings]);
 
@@ -170,17 +179,48 @@ export function SettingsModal() {
                 </p>
               </div>
 
+              <div className="rounded-[1.5rem] border border-slate-200 bg-brand-surface px-5 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-brand-ink">Stage-by-stage progression</div>
+                    <p className="max-w-2xl text-sm leading-6 text-slate-600">
+                      Keep the interview flow sequential. Turn this off if you want to answer any stage in the current track in any order.
+                    </p>
+                  </div>
+                  <button
+                    aria-pressed={sequentialStageFlow}
+                    className={`relative inline-flex h-8 w-14 shrink-0 rounded-full transition ${
+                      sequentialStageFlow ? "bg-brand-teal" : "bg-slate-300"
+                    }`}
+                    onClick={() => setSequentialStageFlow((value) => !value)}
+                    type="button"
+                  >
+                    <span
+                      className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition ${
+                        sequentialStageFlow ? "left-7" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div className="flex justify-end">
                 <button
-                  className="rounded-full bg-brand-teal px-5 py-2 text-sm font-medium text-white transition hover:brightness-105"
+                  className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+                    generalSettingsDirty
+                      ? "bg-brand-teal text-white hover:brightness-105"
+                      : "cursor-not-allowed bg-slate-300 text-black hover:brightness-100"
+                  }`}
+                  disabled={!generalSettingsDirty}
                   onClick={() =>
                     void updateSettings({
-                      defaultMaxTries: Math.min(10, Math.max(1, triesInput)),
-                      defaultAgentId: defaultAgentId || null
+                      defaultMaxTries: normalizedTriesInput,
+                      defaultAgentId: defaultAgentId || null,
+                      sequentialStageFlow
                     })
                   }
                 >
-                  Save general settings
+                  Save
                 </button>
               </div>
             </div>
@@ -217,7 +257,8 @@ export function SettingsModal() {
                     onClick={() =>
                       void updateSettings({
                         defaultMaxTries: Math.min(10, Math.max(1, triesInput)),
-                        defaultAgentId: defaultAgentId || null
+                        defaultAgentId: defaultAgentId || null,
+                        sequentialStageFlow
                       })
                     }
                     type="button"

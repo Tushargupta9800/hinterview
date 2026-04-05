@@ -126,7 +126,8 @@ export const questionStageSuggestionSchema = z.object({
 
 export const appSettingsSchema = z.object({
   defaultMaxTries: z.number().int().min(1).max(10),
-  defaultAgentId: z.string().nullable().default(null)
+  defaultAgentId: z.string().nullable().default(null),
+  sequentialStageFlow: z.boolean().default(true)
 });
 
 export const stageProgressSchema = z.object({

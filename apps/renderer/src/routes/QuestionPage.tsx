@@ -78,6 +78,7 @@ export function QuestionPage() {
     resetStage,
     selectMode,
     sessionLoading,
+    settings,
     startOrResumeSession,
     submitCurrentStage,
     saveDraft,
@@ -141,6 +142,7 @@ export function QuestionPage() {
   const stageRows = activeSessionForMode?.stages ?? questionStages;
   const activeStage = activeSessionForMode?.stages.find((stage) => stage.status === "active") ?? null;
   const hasSolvedMode = Boolean(selectedMode && currentQuestion?.progress?.solvedModes.includes(selectedMode));
+  const sequentialStageFlow = settings?.sequentialStageFlow ?? true;
 
   useEffect(() => {
     if (!currentQuestion || !selectedMode || sessionLoading) {
@@ -297,9 +299,11 @@ export function QuestionPage() {
       : null;
   const isSelectedStageActive = Boolean(
     selectedStage &&
-      activeStage &&
-      selectedStageKey === activeStage.stageId &&
-      selectedStageStatus === "active" &&
+      (((activeStage &&
+        selectedStageKey === activeStage.stageId &&
+        selectedStageStatus === "active") ||
+        (!sequentialStageFlow && selectedStageStatus !== "revealed" && selectedStageStatus !== "solved")) &&
+      "stageId" in selectedStage) &&
       activeSessionForMode
   );
   const minimumWords = selectedStageDefinition?.minimumWords ?? 0;
@@ -307,14 +311,14 @@ export function QuestionPage() {
     activeSessionForMode &&
       selectedStage &&
       "stageId" in selectedStage &&
-      (selectedStageStatus === "active" || selectedStageStatus === "solved")
+      (selectedStageStatus === "active" || selectedStageStatus === "solved" || (!sequentialStageFlow && selectedStageStatus === "locked"))
   );
   const canRequestHintForSelectedStage = Boolean(
-    isSelectedStageActive && activeSessionForMode && activeStage
+    isSelectedStageActive && activeSessionForMode && selectedStage && "stageId" in selectedStage
   );
   const canEditSelectedStageLayout = Boolean(
     selectedStage &&
-      selectedStageStatus !== "locked"
+      (selectedStageStatus !== "locked" || !sequentialStageFlow)
   );
   const canRenderPlayground = Boolean(playgroundScene || (activeSessionForMode?.stages.length ?? 0) > 0);
   const selectedStageHasStoredDraftData = Boolean(
