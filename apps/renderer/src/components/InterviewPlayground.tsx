@@ -88,6 +88,16 @@ type DragState =
       kind: "draw-arrow";
       startX: number;
       startY: number;
+      currentX: number;
+      currentY: number;
+    }
+  | {
+      kind: "draw-shape";
+      shapeKind: PlaygroundShapeKind;
+      startX: number;
+      startY: number;
+      currentX: number;
+      currentY: number;
     };
 
 type InterviewPlaygroundProps = {
@@ -478,6 +488,13 @@ export function InterviewPlayground({
   const [clipboardItem, setClipboardItem] = useState<PlaygroundItem | null>(null);
   const [clipboardGroup, setClipboardGroup] = useState<PlaygroundItem[]>([]);
   const [arrowDraftMarker, setArrowDraftMarker] = useState<{ x: number; y: number } | null>(null);
+  const [shapeDraft, setShapeDraft] = useState<{
+    shapeKind: PlaygroundShapeKind;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const [audioPromptOpen, setAudioPromptOpen] = useState(false);
   const [audioSecondsLeft, setAudioSecondsLeft] = useState(AUDIO_MAX_SECONDS);
@@ -1195,9 +1212,41 @@ export function InterviewPlayground({
     dragRef.current = {
       kind: "draw-arrow",
       startX: clamped.x,
-      startY: clamped.y
+      startY: clamped.y,
+      currentX: clamped.x,
+      currentY: clamped.y
     };
     setArrowDraftMarker(clamped);
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
+  const startShapeDraft = (event: React.PointerEvent, shapeKind: PlaygroundShapeKind) => {
+    if (!contentEditable || !selectedFrame) {
+      return;
+    }
+
+    const point = getPoint(event);
+    const clamped = {
+      x: clamp(point.x, selectedFrame.x + 8, selectedFrame.x + selectedFrame.width - 8),
+      y: clamp(point.y, selectedFrame.y + 44, selectedFrame.y + selectedFrame.height - 8)
+    };
+
+    dragRef.current = {
+      kind: "draw-shape",
+      shapeKind,
+      startX: clamped.x,
+      startY: clamped.y,
+      currentX: clamped.x,
+      currentY: clamped.y
+    };
+    setShapeDraft({
+      shapeKind,
+      startX: clamped.x,
+      startY: clamped.y,
+      currentX: clamped.x,
+      currentY: clamped.y
+    });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1249,6 +1298,11 @@ export function InterviewPlayground({
       } else {
         startArrowDraft(event);
       }
+      return;
+    }
+
+    if ((tool === "rectangle" || tool === "circle" || tool === "cylinder" || tool === "diamond") && contentEditable) {
+      startShapeDraft(event, tool);
       return;
     }
 
@@ -1404,6 +1458,39 @@ export function InterviewPlayground({
         startY: dragState.startY,
         currentX: point.x,
         currentY: point.y
+      });
+      return;
+    }
+
+    if (dragState.kind === "draw-arrow") {
+      const clamped = {
+        x: clamp(point.x, selectedFrame.x + 20, selectedFrame.x + selectedFrame.width - 20),
+        y: clamp(point.y, selectedFrame.y + 54, selectedFrame.y + selectedFrame.height - 20)
+      };
+      dragRef.current = {
+        ...dragState,
+        currentX: clamped.x,
+        currentY: clamped.y
+      };
+      return;
+    }
+
+    if (dragState.kind === "draw-shape") {
+      const clamped = {
+        x: clamp(point.x, selectedFrame.x + 8, selectedFrame.x + selectedFrame.width - 8),
+        y: clamp(point.y, selectedFrame.y + 44, selectedFrame.y + selectedFrame.height - 8)
+      };
+      dragRef.current = {
+        ...dragState,
+        currentX: clamped.x,
+        currentY: clamped.y
+      };
+      setShapeDraft({
+        shapeKind: dragState.shapeKind,
+        startX: dragState.startX,
+        startY: dragState.startY,
+        currentX: clamped.x,
+        currentY: clamped.y
       });
       return;
     }
@@ -1675,6 +1762,68 @@ export function InterviewPlayground({
     }
 
     if (dragState.kind === "draw-arrow") {
+      const width = Math.abs(dragState.currentX - dragState.startX);
+      const height = Math.abs(dragState.currentY - dragState.startY);
+      if (width >= 6 || height >= 6) {
+        const arrow = createDefaultArrowItem(selectedStageId, selectedFrame);
+        const nextArrow: PlaygroundArrowItem = {
+          ...arrow,
+          color: "#0f172a",
+          x: dragState.startX,
+          y: dragState.startY,
+          endX: dragState.currentX,
+          endY: dragState.currentY
+        };
+
+        updateScene((current) => ({
+          ...current,
+          items: [...current.items, nextArrow]
+        }));
+        setSelectedItemId(nextArrow.id);
+        setTool("select");
+        setArrowDraftMarker(null);
+        dragRef.current = null;
+      }
+      return;
+    }
+
+    if (dragState.kind === "draw-shape") {
+      const width = Math.abs(dragState.currentX - dragState.startX);
+      const height = Math.abs(dragState.currentY - dragState.startY);
+
+      if (selectedFrame) {
+        if (width < 6 && height < 6) {
+          const item = {
+            ...createDefaultShapeItem(selectedStageId, selectedFrame, dragState.shapeKind),
+            x: clamp(dragState.startX, selectedFrame.x + 16, selectedFrame.x + selectedFrame.width - 180),
+            y: clamp(dragState.startY, selectedFrame.y + 52, selectedFrame.y + selectedFrame.height - 120)
+          };
+
+          updateScene((current) => ({
+            ...current,
+            items: [...current.items, item]
+          }));
+          setSelectedItemId(item.id);
+        } else {
+          const item = {
+            ...createDefaultShapeItem(selectedStageId, selectedFrame, dragState.shapeKind),
+            x: Math.min(dragState.startX, dragState.currentX),
+            y: Math.min(dragState.startY, dragState.currentY),
+            width: Math.max(48, width),
+            height: Math.max(48, height)
+          };
+
+          updateScene((current) => ({
+            ...current,
+            items: [...current.items, item]
+          }));
+          setSelectedItemId(item.id);
+        }
+      }
+
+      setShapeDraft(null);
+      setTool("select");
+      dragRef.current = null;
       return;
     }
 
@@ -1723,6 +1872,7 @@ export function InterviewPlayground({
 
     dragRef.current = null;
     setSelectionBox(null);
+    setShapeDraft(null);
   };
 
   const selectedInlineToolbar = useMemo(() => {
@@ -2074,14 +2224,38 @@ export function InterviewPlayground({
                   );
                 })}
               {arrowDraftMarker ? (
-                <circle
-                  cx={arrowDraftMarker.x}
-                  cy={arrowDraftMarker.y}
-                  fill="#0f766e"
-                  r={5}
-                  stroke="#ffffff"
-                  strokeWidth={2}
-                />
+                dragRef.current?.kind === "draw-arrow" &&
+                (Math.abs(dragRef.current.currentX - dragRef.current.startX) >= 6 ||
+                  Math.abs(dragRef.current.currentY - dragRef.current.startY) >= 6) ? (
+                  <g>
+                    <line
+                      stroke="#0f766e"
+                      strokeDasharray="8 6"
+                      strokeWidth={2}
+                      x1={dragRef.current.startX}
+                      x2={dragRef.current.currentX}
+                      y1={dragRef.current.startY}
+                      y2={dragRef.current.currentY}
+                    />
+                    <circle
+                      cx={dragRef.current.startX}
+                      cy={dragRef.current.startY}
+                      fill="#0f766e"
+                      r={4}
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    />
+                  </g>
+                ) : (
+                  <circle
+                    cx={arrowDraftMarker.x}
+                    cy={arrowDraftMarker.y}
+                    fill="#0f766e"
+                    r={5}
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                  />
+                )
               ) : null}
             </svg>
 
@@ -2091,7 +2265,7 @@ export function InterviewPlayground({
 
                 return (
                   <div
-                    className={`absolute bg-transparent ${selectedItemId === item.id ? "ring-2 ring-brand-teal/30" : ""}`}
+                    className="absolute bg-transparent"
                     key={`${item.id}-hitbox`}
                     style={{
                       left: bounds.x - 12,
@@ -2464,6 +2638,19 @@ export function InterviewPlayground({
                   width: Math.abs(selectionBox.currentX - selectionBox.startX),
                   height: Math.abs(selectionBox.currentY - selectionBox.startY),
                   zIndex: 70
+                }}
+              />
+            ) : null}
+
+            {shapeDraft ? (
+              <div
+                className="pointer-events-none absolute z-[72] border-2 border-dashed border-brand-teal bg-brand-teal/10"
+                style={{
+                  left: Math.min(shapeDraft.startX, shapeDraft.currentX),
+                  top: Math.min(shapeDraft.startY, shapeDraft.currentY),
+                  width: Math.max(2, Math.abs(shapeDraft.currentX - shapeDraft.startX)),
+                  height: Math.max(2, Math.abs(shapeDraft.currentY - shapeDraft.startY)),
+                  borderRadius: shapeDraft.shapeKind === "rectangle" ? 18 : shapeDraft.shapeKind === "circle" ? "9999px" : 0
                 }}
               />
             ) : null}
