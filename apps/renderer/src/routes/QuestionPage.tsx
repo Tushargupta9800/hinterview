@@ -1,5 +1,5 @@
 import type { InterviewMode, PlaygroundScene, QuestionStage, QuestionStageDraft, StageProgress } from "@hinterview/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { InterviewPlayground } from "../components/InterviewPlayground";
 import { beautifyQuestionStageDraft, saveQuestionStageDraft, suggestQuestionStage, trackTelemetry } from "../lib/api";
@@ -88,11 +88,15 @@ export function QuestionPage() {
   const [selectedPanel, setSelectedPanel] = useState<RightPanel>("question-details");
   const [leftRailCollapsed, setLeftRailCollapsed] = useState(false);
   const [leftRailHoverOpen, setLeftRailHoverOpen] = useState(false);
+  const [leftRailHovering, setLeftRailHovering] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
   const [relatedQuestionOpen, setRelatedQuestionOpen] = useState(false);
   const [relatedSampleQuestion, setRelatedSampleQuestion] = useState("");
   const [relatedDraft, setRelatedDraft] = useState<QuestionStageDraft | null>(null);
   const [relatedQuestionError, setRelatedQuestionError] = useState<string | null>(null);
   const [relatedQuestionBusy, setRelatedQuestionBusy] = useState<"suggest" | "beautify" | "save" | null>(null);
+  const rightSectionRef = useRef<HTMLElement | null>(null);
+  const rightHeaderRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (slug && currentQuestion?.slug !== slug) {
@@ -339,6 +343,30 @@ export function QuestionPage() {
     [activeSessionForMode?.stages]
   );
   const leftRailExpanded = !leftRailCollapsed || leftRailHoverOpen;
+  const shouldShowTopStagePreview = leftRailHoverOpen || (leftRailHovering && !leftRailCollapsed && !headerVisible);
+
+  useEffect(() => {
+    const container = rightSectionRef.current;
+    const header = rightHeaderRef.current;
+
+    if (!container || !header) {
+      return;
+    }
+
+    const updateVisibility = () => {
+      const headerBottom = header.offsetTop + header.offsetHeight;
+      setHeaderVisible(container.scrollTop < headerBottom - 24);
+    };
+
+    updateVisibility();
+    container.addEventListener("scroll", updateVisibility, { passive: true });
+    window.addEventListener("resize", updateVisibility);
+
+    return () => {
+      container.removeEventListener("scroll", updateVisibility);
+      window.removeEventListener("resize", updateVisibility);
+    };
+  }, [selectedPanel, currentQuestion?.slug, selectedMode]);
 
   const buildRelatedQuestionDraft = async () => {
     if (!currentQuestion || !selectedMode || !relatedSampleQuestion.trim()) {
@@ -458,15 +486,57 @@ export function QuestionPage() {
     <>
     <main className="min-h-screen bg-[#07141f] px-6 py-8 text-white md:px-10">
       <div className="flex h-[calc(100vh-7rem)] w-full flex-col gap-6">
+        {shouldShowTopStagePreview ? (
+          <div className="pointer-events-none fixed left-1/2 top-[5.25rem] z-20 w-full max-w-[42rem] -translate-x-1/2 px-6">
+            <section className="pointer-events-auto rounded-[1.5rem] border border-white/10 bg-[#0d1d2b]/95 px-5 py-4 shadow-card backdrop-blur">
+              <div className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                  {selectedPanel === "question-details" ? "Current section" : "Current stage"}
+                </div>
+                {selectedPanel === "question-details" ? (
+                  <>
+                    <div className="text-base font-semibold text-white">Question details</div>
+                    <p className="text-sm leading-6 text-slate-300">{currentQuestion.summary}</p>
+                  </>
+                ) : selectedStage ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                        Stage {(selectedStage.orderIndex ?? 0) + 1}
+                      </span>
+                      {isSharedStageTitle(selectedStage.title, currentQuestion?.supportedModes ?? []) ? (
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Shared
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-base font-semibold text-white">{selectedStage.title}</div>
+                    <p className="text-sm leading-6 text-slate-300">
+                      {"prompt" in selectedStage ? selectedStage.prompt : stageDefinitions.get(getStageKey(selectedStage))?.prompt ?? ""}
+                    </p>
+                    {("guidance" in selectedStage ? selectedStage.guidance : stageDefinitions.get(getStageKey(selectedStage))?.guidance) ? (
+                      <p className="text-xs leading-5 text-slate-400">
+                        {"guidance" in selectedStage ? selectedStage.guidance : stageDefinitions.get(getStageKey(selectedStage))?.guidance}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         <section className={`grid min-h-0 ${leftRailCollapsed ? "gap-0 xl:grid-cols-[58px_minmax(0,1fr)]" : "gap-6 xl:grid-cols-[310px_minmax(0,1fr)]"}`}>
           <aside
             className="relative min-h-0"
             onMouseEnter={() => {
+              setLeftRailHovering(true);
               if (leftRailCollapsed) {
                 setLeftRailHoverOpen(true);
               }
             }}
             onMouseLeave={() => {
+              setLeftRailHovering(false);
               if (leftRailCollapsed) {
                 setLeftRailHoverOpen(false);
               }
@@ -734,8 +804,8 @@ export function QuestionPage() {
             ) : null}
           </aside>
 
-          <section className="min-h-0 overflow-y-auto rounded-[2rem] border border-white/10 bg-[#f7fbfc] text-brand-ink shadow-card">
-            <div className="border-b border-slate-200 bg-white px-7 py-6 md:px-8">
+          <section className="min-h-0 overflow-y-auto rounded-[2rem] border border-white/10 bg-[#f7fbfc] text-brand-ink shadow-card" ref={rightSectionRef}>
+            <div className="border-b border-slate-200 bg-white px-7 py-6 md:px-8" ref={rightHeaderRef}>
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-2">
                   {selectedPanel === "question-details" ? (

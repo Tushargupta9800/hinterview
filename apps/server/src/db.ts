@@ -1387,6 +1387,33 @@ const getLatestActiveSessionRow = (questionSlug: string, mode: InterviewMode): S
   return rows.find((row) => isSessionCompatible(row.id)) ?? null;
 };
 
+const isFullySolvedSession = (sessionId: string): boolean => {
+  const session = hydrateSession(sessionId);
+  return session?.stages.every((stage) => stage.status === "solved") ?? false;
+};
+
+const getPreferredSessionRow = (questionSlug: string, mode: InterviewMode): SessionRow | null => {
+  const rows = database
+    .prepare(
+      `SELECT * FROM sessions
+       WHERE question_slug = ? AND mode = ?
+       ORDER BY updated_at DESC`
+    )
+    .all(questionSlug, mode) as SessionRow[];
+
+  const compatibleRows = rows.filter((row) => isSessionCompatible(row.id));
+  if (compatibleRows.length === 0) {
+    return null;
+  }
+
+  const fullySolved = compatibleRows.find((row) => isFullySolvedSession(row.id));
+  if (fullySolved) {
+    return fullySolved;
+  }
+
+  return compatibleRows.find((row) => row.status === "active") ?? compatibleRows[0] ?? null;
+};
+
 const getQuestionProgressMap = (): Map<string, QuestionSummary["progress"]> => {
   const rows = database
     .prepare(
@@ -1403,6 +1430,7 @@ const getQuestionProgressMap = (): Map<string, QuestionSummary["progress"]> => {
     }>;
 
   const map = new Map<string, QuestionSummary["progress"]>();
+  const latestModeSeen = new Set<string>();
 
   for (const row of rows) {
     if (!isSessionCompatible(row.id)) {
@@ -1426,22 +1454,32 @@ const getQuestionProgressMap = (): Map<string, QuestionSummary["progress"]> => {
 
     const session = hydrateSession(row.id);
     const completionPercent = session?.completionPercent ?? existing.completionPercent;
+    const latestModeKey = `${row.question_slug}:${row.mode}`;
+    const hasIncompleteStage =
+      session?.stages.some((stage) => stage.status === "active" || stage.status === "locked") ?? (row.status === "active");
+    const allStagesSolved = session?.stages.every((stage) => stage.status === "solved") ?? false;
 
-    if (row.status === "active" && !existing.hasActiveSession) {
-      existing.hasActiveSession = true;
-      existing.activeMode = row.mode;
-      existing.completionPercent = completionPercent;
+    if (!latestModeSeen.has(latestModeKey)) {
+      existing.modeHasActiveSession[row.mode] = hasIncompleteStage && !allStagesSolved;
+      if (existing.modeHasActiveSession[row.mode] && !existing.hasActiveSession) {
+        existing.hasActiveSession = true;
+        existing.activeMode = row.mode;
+        existing.completionPercent = completionPercent;
+      }
+      latestModeSeen.add(latestModeKey);
     }
 
     existing.modeCompletionPercent[row.mode] = Math.max(existing.modeCompletionPercent[row.mode] ?? 0, completionPercent);
-    if (row.status === "active") {
-      existing.modeHasActiveSession[row.mode] = true;
-    }
 
-    if (row.status === "completed" && session && session.stages.every((stage) => stage.status === "solved")) {
+    if (allStagesSolved) {
       if (!existing.solvedModes.includes(row.mode)) {
         existing.solvedModes.push(row.mode);
       }
+      existing.modeHasActiveSession[row.mode] = false;
+      if (existing.activeMode === row.mode) {
+        existing.activeMode = null;
+      }
+      existing.hasActiveSession = Object.values(existing.modeHasActiveSession).some(Boolean);
       existing.completionPercent = Math.max(existing.completionPercent, completionPercent);
     } else {
       existing.completionPercent = Math.max(existing.completionPercent, completionPercent);
@@ -2370,7 +2408,7 @@ export const createOrResumeSession = (slug: string, requestBody: SessionRequest)
     throw new Error("Add an AI agent profile before starting an interview session");
   }
 
-  const existing = request.restart ? null : getLatestActiveSessionRow(slug, request.mode);
+  const existing = request.restart ? null : getPreferredSessionRow(slug, request.mode);
 
   if (existing) {
     const session = hydrateSession(existing.id);

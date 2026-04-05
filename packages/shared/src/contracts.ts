@@ -364,7 +364,8 @@ export const playgroundTextItemSchema = playgroundBaseItemSchema.extend({
   text: z.string(),
   fontFamily: playgroundFontFamilySchema,
   fontSize: z.number().int().min(6).max(25),
-  fontWeight: z.enum(["regular", "medium", "bold"])
+  fontWeight: z.enum(["regular", "medium", "bold"]),
+  maxWidth: z.number().positive().optional()
 });
 
 export const playgroundShapeItemSchema = playgroundBaseItemSchema.extend({

@@ -217,7 +217,6 @@ body {
 }
 
 :root.theme-dark .playground-shell,
-:root.theme-dark .playground-shell button,
 :root.theme-dark .playground-shell .text-brand-ink,
 :root.theme-dark .playground-shell .text-slate-900,
 :root.theme-dark .playground-shell .text-slate-800,
@@ -262,4 +261,15 @@ body {
 
 :root.theme-dark .playground-shell .bg-\[linear-gradient\(to_right\,\#eef2f7_1px\,transparent_1px\)\,linear-gradient\(to_bottom\,\#eef2f7_1px\,transparent_1px\)\] {
   background-image: linear-gradient(to right, #eef2f7 1px, transparent 1px), linear-gradient(to bottom, #eef2f7 1px, transparent 1px) !important;
+}
+
+:root.theme-dark .playground-shell button.border-brand-teal.text-brand-teal {
+  color: #0f766e !important;
+  border-color: #0f766e !important;
+}
+
+:root.theme-dark .playground-shell button.bg-brand-ink.text-white {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #0f172a !important;
 }

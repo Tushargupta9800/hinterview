@@ -198,6 +198,7 @@ export const buildStagePlaygroundAnswer = (
 
 export const createDefaultTextItem = (stageId: string, frame: PlaygroundFrame): PlaygroundTextItem => {
   const timestamp = nowIso();
+  const defaultMaxWidth = Math.max(frame.width - 56, 180);
   return {
     id: crypto.randomUUID(),
     type: "text",
@@ -212,6 +213,7 @@ export const createDefaultTextItem = (stageId: string, frame: PlaygroundFrame): 
     fontFamily: "sans",
     fontSize: 16,
     fontWeight: "medium",
+    maxWidth: defaultMaxWidth,
     createdAt: timestamp,
     updatedAt: timestamp
   };

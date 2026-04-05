@@ -77,6 +77,14 @@ type DragState =
       original: PlaygroundItem;
     }
   | {
+      kind: "move-arrow-endpoint";
+      itemId: string;
+      endpoint: "start" | "end";
+      startX: number;
+      startY: number;
+      original: PlaygroundArrowItem;
+    }
+  | {
       kind: "draw-arrow";
       startX: number;
       startY: number;
@@ -175,17 +183,19 @@ const measureTextItemSize = ({
   fontSize,
   fontFamily,
   fontWeight,
-  maxWidth
+  maxWidth,
+  minWidth = 160,
+  minHeight = 48
 }: {
   text: string;
   fontSize: number;
   fontFamily: PlaygroundFontFamily;
   fontWeight: "regular" | "medium" | "bold";
   maxWidth: number;
+  minWidth?: number;
+  minHeight?: number;
 }) => {
-  const minWidth = 160;
-  const minHeight = 48;
-  const horizontalPadding = 12;
+  const horizontalPadding = 20;
   const verticalPadding = 10;
   const lineHeight = Math.max(8, Math.round(fontSize * 1.25));
   const content = text.trim().length ? text : "";
@@ -317,7 +327,9 @@ const fitTextFontSizeForBox = ({
       fontSize: candidate,
       fontFamily,
       fontWeight,
-      maxWidth: targetWidth
+      maxWidth: targetWidth,
+      minWidth: 0,
+      minHeight: 0
     });
 
     if (measured.height <= targetHeight && measured.width <= targetWidth) {
@@ -466,6 +478,7 @@ export function InterviewPlayground({
   const [clipboardItem, setClipboardItem] = useState<PlaygroundItem | null>(null);
   const [clipboardGroup, setClipboardGroup] = useState<PlaygroundItem[]>([]);
   const [arrowDraftMarker, setArrowDraftMarker] = useState<{ x: number; y: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const [audioPromptOpen, setAudioPromptOpen] = useState(false);
   const [audioSecondsLeft, setAudioSecondsLeft] = useState(AUDIO_MAX_SECONDS);
   const [audioError, setAudioError] = useState<string | null>(null);
@@ -1252,6 +1265,12 @@ export function InterviewPlayground({
         currentX: point.x,
         currentY: point.y
       };
+      setSelectionBox({
+        startX: point.x,
+        startY: point.y,
+        currentX: point.x,
+        currentY: point.y
+      });
       setSelectedItemId(null);
       setSelectedGroupIds([]);
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -1260,6 +1279,25 @@ export function InterviewPlayground({
 
     setSelectedItemId(null);
     setSelectedGroupIds([]);
+  };
+
+  const startArrowEndpointMove = (
+    event: React.PointerEvent,
+    item: PlaygroundArrowItem,
+    endpoint: "start" | "end"
+  ) => {
+    event.stopPropagation();
+    dragRef.current = {
+      kind: "move-arrow-endpoint",
+      itemId: item.id,
+      endpoint,
+      startX: event.clientX,
+      startY: event.clientY,
+      original: item
+    };
+    setSelectedItemId(item.id);
+    setSelectedGroupIds([]);
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
   const handleTripleClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1314,6 +1352,8 @@ export function InterviewPlayground({
       return;
     }
 
+    const point = getPoint(event);
+
     const deltaX = (event.clientX - dragState.startX) / zoom;
     const deltaY = (event.clientY - dragState.startY) / zoom;
 
@@ -1354,12 +1394,17 @@ export function InterviewPlayground({
     }
 
     if (dragState.kind === "select-box") {
-      const point = getPoint(event);
       dragRef.current = {
         ...dragState,
         currentX: point.x,
         currentY: point.y
       };
+      setSelectionBox({
+        startX: dragState.startX,
+        startY: dragState.startY,
+        currentX: point.x,
+        currentY: point.y
+      });
       return;
     }
 
@@ -1416,6 +1461,32 @@ export function InterviewPlayground({
           x: clamp(dragState.original.x + deltaX, frame.x + 8, frame.x + frame.width - item.width - 8),
           y: clamp(dragState.original.y + deltaY, frame.y + 44, frame.y + frame.height - item.height - 8)
         };
+      });
+      return;
+    }
+
+    if (dragState.kind === "move-arrow-endpoint") {
+      updateItem(dragState.itemId, (item) => {
+        if (item.type !== "arrow") {
+          return item;
+        }
+
+        const clamped = {
+          x: clamp(point.x, frame.x + 8, frame.x + frame.width - 8),
+          y: clamp(point.y, frame.y + 44, frame.y + frame.height - 8)
+        };
+
+        return dragState.endpoint === "start"
+          ? {
+              ...item,
+              x: clamped.x,
+              y: clamped.y
+            }
+          : {
+              ...item,
+              endX: clamped.x,
+              endY: clamped.y
+            };
       });
       return;
     }
@@ -1490,24 +1561,58 @@ export function InterviewPlayground({
             nextY = clamp(originalItem.y + deltaY, frame.y + 44, originalItem.y + originalItem.height - minHeight);
           }
 
-          const resizeScale = getTextResizeScale(
-            dragState.handle,
-            {
-              width: Math.max(originalItem.width, minWidth),
-              height: Math.max(originalItem.height, minHeight)
-            },
-            {
-              width: Math.max(nextWidth, minWidth),
-              height: Math.max(nextHeight, minHeight)
+          const resizedWidth = Math.max(nextWidth, minWidth);
+          const resizedHeight = Math.max(nextHeight, minHeight);
+          const isShrinking = resizedWidth < originalItem.width || resizedHeight < originalItem.height;
+          let nextFontSize = originalItem.fontSize;
+
+          if (isShrinking) {
+            const measuredAtCurrentFont = measureTextItemSize({
+              text: originalItem.text,
+              fontSize: originalItem.fontSize,
+              fontFamily: originalItem.fontFamily,
+              fontWeight: originalItem.fontWeight,
+              maxWidth: resizedWidth,
+              minWidth: 0,
+              minHeight: 0
+            });
+            const horizontalPadding = resizedWidth - measuredAtCurrentFont.width;
+            const canKeepCurrentFont =
+              horizontalPadding > 20 && measuredAtCurrentFont.height <= resizedHeight;
+
+            if (!canKeepCurrentFont) {
+              nextFontSize = fitTextFontSizeForBox({
+                text: originalItem.text,
+                fontFamily: originalItem.fontFamily,
+                fontWeight: originalItem.fontWeight,
+                targetWidth: resizedWidth,
+                targetHeight: resizedHeight,
+                preferredFontSize: originalItem.fontSize
+              });
             }
-          );
+          } else {
+            const resizeScale = getTextResizeScale(
+              dragState.handle,
+              {
+                width: Math.max(originalItem.width, minWidth),
+                height: Math.max(originalItem.height, minHeight)
+              },
+              {
+                width: resizedWidth,
+                height: resizedHeight
+              }
+            );
+            nextFontSize = clamp(Math.round(originalItem.fontSize * resizeScale), MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
+          }
+
           return {
             ...item,
             x: nextX,
             y: nextY,
-            width: Math.max(nextWidth, minWidth),
-            height: Math.max(nextHeight, minHeight),
-            fontSize: clamp(Math.round(originalItem.fontSize * resizeScale), MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE)
+            width: resizedWidth,
+            height: resizedHeight,
+            maxWidth: resizedWidth,
+            fontSize: nextFontSize
           };
         }
 
@@ -1588,6 +1693,7 @@ export function InterviewPlayground({
       setSelectedGroupIds(ids.length > 1 ? ids : []);
       setSelectedItemId(ids.length === 1 ? ids[0]! : null);
       setTool("select");
+      setSelectionBox(null);
       dragRef.current = null;
       return;
     }
@@ -1608,7 +1714,7 @@ export function InterviewPlayground({
               fontWeight: item.fontWeight,
               targetWidth: item.width,
               targetHeight: item.height,
-              preferredFontSize: MAX_TEXT_FONT_SIZE
+              preferredFontSize: item.fontSize
             })
           };
         });
@@ -1616,6 +1722,7 @@ export function InterviewPlayground({
     }
 
     dragRef.current = null;
+    setSelectionBox(null);
   };
 
   const selectedInlineToolbar = useMemo(() => {
@@ -2001,7 +2108,7 @@ export function InterviewPlayground({
                           onPointerDown={(event) => startItemMove(event, item)}
                           stroke="transparent"
                           strokeWidth={12}
-                          style={{ pointerEvents: "stroke" }}
+                          style={{ pointerEvents: "stroke", cursor: "move" }}
                           x1={item.x - (bounds.x - 12)}
                           x2={item.endX - (bounds.x - 12)}
                           y1={item.y - (bounds.y - 12)}
@@ -2012,16 +2119,23 @@ export function InterviewPlayground({
                     {editable && selectedItemId === item.id ? (
                       <>
                         <button
-                          className="absolute left-1/2 top-[-22px] h-4 w-4 -translate-x-1/2 rounded-full border border-brand-teal bg-white"
-                          onPointerDown={(event) => startItemRotate(event, item)}
-                          style={{ pointerEvents: "auto" }}
+                          className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-brand-teal bg-white"
+                          onPointerDown={(event) => startArrowEndpointMove(event, item, "start")}
+                          style={{
+                            left: item.x - (bounds.x - 12),
+                            top: item.y - (bounds.y - 12),
+                            pointerEvents: "auto"
+                          }}
                           type="button"
                         />
-                        <span className="absolute left-1/2 top-[-6px] h-4 w-[1px] -translate-x-1/2 bg-brand-teal" />
                         <button
-                          className="absolute right-[-7px] top-1/2 h-3.5 w-3.5 -translate-y-1/2 cursor-ew-resize rounded-full border border-brand-teal bg-white"
-                          onPointerDown={(event) => startItemResize(event, item, "east")}
-                          style={{ pointerEvents: "auto" }}
+                          className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-brand-teal bg-white"
+                          onPointerDown={(event) => startArrowEndpointMove(event, item, "end")}
+                          style={{
+                            left: item.endX - (bounds.x - 12),
+                            top: item.endY - (bounds.y - 12),
+                            pointerEvents: "auto"
+                          }}
                           type="button"
                         />
                       </>
@@ -2073,7 +2187,8 @@ export function InterviewPlayground({
                               return current;
                             }
                             const frame = getFrameForStage(scene, current.stageId);
-                            const maxWidth = frame ? Math.max(frame.width - 56, 180) : 520;
+                            const frameMaxWidth = frame ? Math.max(frame.width - 56, 180) : 520;
+                            const maxWidth = Math.min(current.maxWidth ?? frameMaxWidth, frameMaxWidth);
                             const measured = measureTextItemSize({
                               text: event.target.value,
                               fontSize: current.fontSize,
@@ -2084,6 +2199,7 @@ export function InterviewPlayground({
                             return {
                               ...current,
                               text: event.target.value,
+                              maxWidth,
                               width: Math.max(current.width, measured.width),
                               height: Math.max(current.height, measured.height)
                             };
@@ -2236,32 +2352,45 @@ export function InterviewPlayground({
                       )}
                     </svg>
                     {tool === "select" ? (
-                      <>
-                        <button
-                          className="absolute left-[-5px] right-[-5px] top-[-5px] h-3 cursor-move bg-transparent"
-                          onPointerDown={(event) => startItemMove(event, item)}
-                          style={{ pointerEvents: "auto" }}
-                          type="button"
-                        />
-                        <button
-                          className="absolute bottom-[-5px] left-[-5px] right-[-5px] h-3 cursor-move bg-transparent"
-                          onPointerDown={(event) => startItemMove(event, item)}
-                          style={{ pointerEvents: "auto" }}
-                          type="button"
-                        />
-                        <button
-                          className="absolute bottom-[-5px] left-[-5px] top-[-5px] w-3 cursor-move bg-transparent"
-                          onPointerDown={(event) => startItemMove(event, item)}
-                          style={{ pointerEvents: "auto" }}
-                          type="button"
-                        />
-                        <button
-                          className="absolute bottom-[-5px] right-[-5px] top-[-5px] w-3 cursor-move bg-transparent"
-                          onPointerDown={(event) => startItemMove(event, item)}
-                          style={{ pointerEvents: "auto" }}
-                          type="button"
-                        />
-                      </>
+                      item.shapeKind === "diamond" ? (
+                        <svg className="absolute inset-0 overflow-visible" height={item.height} width={item.width}>
+                          <polygon
+                            fill="none"
+                            points={`${item.width / 2},2 ${item.width - 2},${item.height / 2} ${item.width / 2},${item.height - 2} 2,${item.height / 2}`}
+                            stroke="transparent"
+                            strokeWidth={10}
+                            style={{ pointerEvents: "stroke", cursor: "move" }}
+                            onPointerDown={(event) => startItemMove(event, item)}
+                          />
+                        </svg>
+                      ) : (
+                        <>
+                          <button
+                            className="absolute left-[-5px] right-[-5px] top-[-5px] h-3 cursor-move bg-transparent"
+                            onPointerDown={(event) => startItemMove(event, item)}
+                            style={{ pointerEvents: "auto" }}
+                            type="button"
+                          />
+                          <button
+                            className="absolute bottom-[-5px] left-[-5px] right-[-5px] h-3 cursor-move bg-transparent"
+                            onPointerDown={(event) => startItemMove(event, item)}
+                            style={{ pointerEvents: "auto" }}
+                            type="button"
+                          />
+                          <button
+                            className="absolute bottom-[-5px] left-[-5px] top-[-5px] w-3 cursor-move bg-transparent"
+                            onPointerDown={(event) => startItemMove(event, item)}
+                            style={{ pointerEvents: "auto" }}
+                            type="button"
+                          />
+                          <button
+                            className="absolute bottom-[-5px] right-[-5px] top-[-5px] w-3 cursor-move bg-transparent"
+                            onPointerDown={(event) => startItemMove(event, item)}
+                            style={{ pointerEvents: "auto" }}
+                            type="button"
+                          />
+                        </>
+                      )
                     ) : null}
                     {layoutItemEditable && isSelected ? (
                       <>
@@ -2326,14 +2455,14 @@ export function InterviewPlayground({
                 );
               })}
 
-            {dragRef.current?.kind === "select-box" ? (
+            {selectionBox ? (
               <div
                 className="pointer-events-none absolute border-2 border-dashed border-brand-teal bg-brand-teal/10"
                 style={{
-                  left: Math.min(dragRef.current.startX, dragRef.current.currentX),
-                  top: Math.min(dragRef.current.startY, dragRef.current.currentY),
-                  width: Math.abs(dragRef.current.currentX - dragRef.current.startX),
-                  height: Math.abs(dragRef.current.currentY - dragRef.current.startY),
+                  left: Math.min(selectionBox.startX, selectionBox.currentX),
+                  top: Math.min(selectionBox.startY, selectionBox.currentY),
+                  width: Math.abs(selectionBox.currentX - selectionBox.startX),
+                  height: Math.abs(selectionBox.currentY - selectionBox.startY),
                   zIndex: 70
                 }}
               />
