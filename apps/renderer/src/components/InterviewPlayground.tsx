@@ -1462,10 +1462,15 @@ export function InterviewPlayground({
       return;
     }
 
+    const frame = selectedFrame;
+    if (!frame) {
+      return;
+    }
+
     if (dragState.kind === "draw-arrow") {
       const clamped = {
-        x: clamp(point.x, selectedFrame.x + 20, selectedFrame.x + selectedFrame.width - 20),
-        y: clamp(point.y, selectedFrame.y + 54, selectedFrame.y + selectedFrame.height - 20)
+        x: clamp(point.x, frame.x + 20, frame.x + frame.width - 20),
+        y: clamp(point.y, frame.y + 54, frame.y + frame.height - 20)
       };
       dragRef.current = {
         ...dragState,
@@ -1477,8 +1482,8 @@ export function InterviewPlayground({
 
     if (dragState.kind === "draw-shape") {
       const clamped = {
-        x: clamp(point.x, selectedFrame.x + 8, selectedFrame.x + selectedFrame.width - 8),
-        y: clamp(point.y, selectedFrame.y + 44, selectedFrame.y + selectedFrame.height - 8)
+        x: clamp(point.x, frame.x + 8, frame.x + frame.width - 8),
+        y: clamp(point.y, frame.y + 44, frame.y + frame.height - 8)
       };
       dragRef.current = {
         ...dragState,
@@ -1519,11 +1524,6 @@ export function InterviewPlayground({
               };
         })
       }));
-      return;
-    }
-
-    const frame = selectedFrame;
-    if (!frame) {
       return;
     }
 
